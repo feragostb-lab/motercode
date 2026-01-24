@@ -23,6 +23,12 @@ class MatchType(Enum):
     BOTH = "both"
 
 
+class PeriodStatus(Enum):
+    """Estado de un periodo."""
+    ACTIVE = "active"
+    CLOSED = "closed"
+
+
 @dataclass
 class Receipt:
     """Represents a processed receipt."""
@@ -173,3 +179,90 @@ class IgnoredReceipt:
             'ignored_at': self.ignored_at.isoformat() if self.ignored_at else None,
             'reason': self.reason,
         }
+
+
+@dataclass
+class Worker:
+    """Representa un trabajador."""
+    id: Optional[int] = None
+    nombre: str = ""
+    activo: bool = True
+    created_at: Optional[datetime] = None
+    
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert worker to dictionary."""
+        return {
+            'id': self.id,
+            'nombre': self.nombre,
+            'activo': self.activo,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+        }
+
+
+@dataclass
+class Period:
+    """Representa un periodo mensual de un trabajador."""
+    id: Optional[int] = None
+    worker_id: int = 0
+    month_year: str = ""  # Formato: "MMYYYY"
+    status: PeriodStatus = PeriodStatus.ACTIVE
+    is_processing_active: bool = False
+    csv_last_upload: Optional[datetime] = None
+    csv_file_path: Optional[str] = None
+    closed_at: Optional[datetime] = None
+    created_at: Optional[datetime] = None
+    
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert period to dictionary."""
+        return {
+            'id': self.id,
+            'worker_id': self.worker_id,
+            'month_year': self.month_year,
+            'status': self.status.value if self.status else None,
+            'is_processing_active': self.is_processing_active,
+            'csv_last_upload': self.csv_last_upload.isoformat() if self.csv_last_upload else None,
+            'csv_file_path': self.csv_file_path,
+            'closed_at': self.closed_at.isoformat() if self.closed_at else None,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+        }
+
+
+@dataclass
+class PeriodClosure:
+    """Representa un cierre de periodo."""
+    id: Optional[int] = None
+    period_id: int = 0
+    closure_date: Optional[datetime] = None
+    export_path: str = ""
+    reopened_at: Optional[datetime] = None
+    reopen_reason: Optional[str] = None
+    stats_snapshot: Optional[Dict[str, Any]] = None
+    created_at: Optional[datetime] = None
+    
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert period closure to dictionary."""
+        return {
+            'id': self.id,
+            'period_id': self.period_id,
+            'closure_date': self.closure_date.isoformat() if self.closure_date else None,
+            'export_path': self.export_path,
+            'reopened_at': self.reopened_at.isoformat() if self.reopened_at else None,
+            'reopen_reason': self.reopen_reason,
+            'stats_snapshot': self.stats_snapshot,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+        }
+
+
+@dataclass
+class PeriodStats:
+    """Estadísticas de un periodo."""
+    period_id: int = 0
+    total_receipts: int = 0
+    processed_receipts: int = 0
+    matched_receipts: int = 0
+    conflict_receipts: int = 0
+    unprocessed_images: int = 0
+    has_csv: bool = False
+    csv_upload_date: Optional[datetime] = None
+    can_close: bool = False
+    blocking_reasons: list = field(default_factory=list)

@@ -171,3 +171,38 @@ class ReceiptRepository(BaseRepository[Receipt]):
                 WHERE id = ?
             ''', (new_path, datetime.now().isoformat(), receipt_id))
             return cursor.rowcount > 0
+    
+    # ===== ROC SKINCARE: Multi-worker methods =====
+    
+    def get_by_period(self, period_id: int) -> List[Receipt]:
+        """Get all receipts for a period."""
+        with self.db.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                'SELECT * FROM receipts WHERE period_id = ? ORDER BY created_at DESC',
+                (period_id,)
+            )
+            rows = cursor.fetchall()
+            return [self._row_to_model(row) for row in rows]
+    
+    def get_by_worker(self, worker_id: int) -> List[Receipt]:
+        """Get all receipts for a worker."""
+        with self.db.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                'SELECT * FROM receipts WHERE worker_id = ? ORDER BY created_at DESC',
+                (worker_id,)
+            )
+            rows = cursor.fetchall()
+            return [self._row_to_model(row) for row in rows]
+    
+    def update_worker_and_period(self, receipt_id: int, worker_id: int, period_id: int) -> bool:
+        """Update worker_id and period_id for a receipt."""
+        with self.db.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute('''
+                UPDATE receipts SET worker_id = ?, period_id = ?, updated_at = ?
+                WHERE id = ?
+            ''', (worker_id, period_id, datetime.now().isoformat(), receipt_id))
+            return cursor.rowcount > 0
+

@@ -159,3 +159,97 @@ def deduplicar_nombre_archivo(file_path: str, existing_files: list) -> str:
         counter += 1
     
     return new_path
+
+
+# ===== ROC SKINCARE: Spanish formatting functions =====
+
+def format_date_spanish(date: datetime) -> str:
+    """
+    Format date in Spanish format: dd/mm/yyyy
+    
+    Args:
+        date: datetime object
+        
+    Returns:
+        Formatted string
+    """
+    if not date:
+        return ""
+    return date.strftime('%d/%m/%Y')
+
+
+def format_datetime_spanish(dt: datetime) -> str:
+    """
+    Format datetime in Spanish format: dd/mm/yyyy HH:MM:SS
+    
+    Args:
+        dt: datetime object
+        
+    Returns:
+        Formatted string
+    """
+    if not dt:
+        return ""
+    return dt.strftime('%d/%m/%Y %H:%M:%S')
+
+
+def parse_date_spanish(date_str: str) -> Optional[datetime]:
+    """
+    Parse Spanish date format: dd/mm/yyyy
+    
+    Args:
+        date_str: Date string
+        
+    Returns:
+        datetime object or None if parse fails
+    """
+    try:
+        return datetime.strptime(date_str, '%d/%m/%Y')
+    except:
+        return None
+
+
+def format_month_year_display(month_year: str) -> str:
+    """
+    Convert MMYYYY to display format: "Enero 2026"
+    
+    Args:
+        month_year: Period in format "MMYYYY"
+        
+    Returns:
+        Display string in Spanish
+    """
+    month_names = {
+        '01': 'Enero', '02': 'Febrero', '03': 'Marzo',
+        '04': 'Abril', '05': 'Mayo', '06': 'Junio',
+        '07': 'Julio', '08': 'Agosto', '09': 'Septiembre',
+        '10': 'Octubre', '11': 'Noviembre', '12': 'Diciembre'
+    }
+    
+    if len(month_year) != 6:
+        return month_year
+    
+    month = month_year[:2]
+    year = month_year[2:]
+    
+    return f"{month_names.get(month, month)} {year}"
+
+
+def parse_datetime(dt_str: str) -> Optional[datetime]:
+    """
+    Parse ISO datetime string to datetime object.
+    
+    Args:
+        dt_str: ISO format datetime string
+        
+    Returns:
+        datetime object or None if parsing fails
+    """
+    if not dt_str:
+        return None
+    
+    try:
+        return datetime.fromisoformat(dt_str)
+    except:
+        return None
+

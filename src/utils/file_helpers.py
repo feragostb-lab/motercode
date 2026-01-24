@@ -3,7 +3,7 @@ import base64
 import io
 from pathlib import Path
 from PIL import Image
-from typing import Tuple, Optional
+from typing import Tuple, Optional, Dict
 import logging
 
 logger = logging.getLogger(__name__)
@@ -140,3 +140,39 @@ def get_image_files(directory: str, extensions: Tuple[str, ...] = ('.jpg', '.jpe
         image_files.extend(dir_path.glob(f'*{ext.upper()}'))
     
     return [str(f) for f in sorted(image_files)]
+
+
+def get_period_paths(worker_name: str, month_year: str) -> Dict[str, Path]:
+    """
+    Get all paths for a worker's period.
+    
+    Args:
+        worker_name: Worker name
+        month_year: Period in format "MMYYYY"
+        
+    Returns:
+        Dict with keys: 'base', 'img', 'result', 'csv'
+    """
+    base = Path('./workers') / worker_name / month_year
+    
+    return {
+        'base': base,
+        'img': base / 'img',
+        'result': base / 'result',
+        'csv': base / 'csv',
+    }
+
+
+def validate_worker_name(name: str) -> bool:
+    """
+    Validate worker name (alphanumeric only).
+    
+    Args:
+        name: Name to validate
+        
+    Returns:
+        True if valid
+    """
+    import re
+    return bool(re.match(r'^[a-zA-Z0-9]+$', name))
+

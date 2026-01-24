@@ -429,3 +429,172 @@ class BankMatchingService:
             MatchType.NONE: 0.0,
         }
         return confidence_map.get(match_type, 0.0)
+    
+    # ===== ROC SKINCARE: Multi-worker CSV upload =====
+    
+    def upload_csv_for_period(self, worker_id: int, period_id: int, csv_file_path: str) -> int:
+        """
+        Upload and process CSV for a specific period.
+        
+        Replaces any previous transactions for this period.
+        
+        Args:
+            worker_id: Worker ID
+            period_id: Period ID
+            csv_file_path: Path to CSV file to upload
+            
+        Returns:
+            Number of transactions loaded
+            
+        Raises:
+            ValueError: If file doesn't exist or processing fails
+        """
+        from pathlib import Path
+        import pandas as pd
+        from ..repositories.period_repository import PeriodRepository
+        from ..repositories.worker_repository import WorkerRepository
+        from ..utils.file_helpers import get_period_paths
+        from ..utils.formatters import parse_date_spanish
+        
+        # Validate file exists
+        if not Path(csv_file_path).exists():
+            raise ValueError(f"Archivo CSV no encontrado: {csv_file_path}")
+        
+        # Get worker and period info
+        worker_repo = WorkerRepository(self.db)
+        period_repo = PeriodRepository(self.db)
+        
+        worker = worker_repo.get_by_id(worker_id)
+        if not worker:
+            raise ValueError(f"Trabajador con ID {worker_id} no existe")
+        
+        period = period_repo.get_by_id(period_id)
+        if not period:
+            raise ValueError(f"Periodo con ID {period_id} no existe")
+        
+        # Generate timestamped filename
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        paths = get_period_paths(worker.nombre, period.month_year)
+        paths['csv'].mkdir(parents=True, exist_ok=True)
+        
+        new_csv_filename = f"banco_{timestamp}.csv"
+        new_csv_path = paths['csv'] / new_csv_filename
+        
+        # Copy CSV to period directory
+        import shutil
+        shutil.copy2(csv_file_path, new_csv_path)
+        logger.info(f"CSV copied to {new_csv_path}")
+        
+        # Read and process CSV (assuming Spanish date format dd/mm/yyyy)
+        try:
+            df = pd.read_excel(csv_file_path, skiprows=13) if csv_file_path.endswith('.xlsx') else pd.read_csv(csv_file_path)
+            
+            # Clean column names
+            df.columns = ['fecha', 'descripcion', 'metodo', 'importe']
+            
+            # Remove rows with no date
+            df = df[df['fecha'].notna()].copy()
+            
+            # Filter out summary rows
+            summary_keywords = [
+                'MES', 'SITUACIÓN', 'SITUACION', 
+                'DICIEMBRE', 'ENERO', 'FEBRERO', 'MARZO', 'ABRIL', 'MAYO',
+                'JUNIO', 'JULIO', 'AGOSTO', 'SEPTIEMBRE', 'OCTUBRE', 'NOVIEMBRE'
+            ]
+            pattern = '|'.join(summary_keywords)
+            df = df[~df['fecha'].astype(str).str.upper().str.contains(pattern, na=False)].copy()
+            
+            # Parse dates - try Spanish format first (dd/mm/yyyy), then other formats
+            df['fecha_procesada'] = pd.to_datetime(df['fecha'], format='%d/%m/%Y', errors='coerce')
+            if df['fecha_procesada'].isna().all():
+                # Try dot separator
+                df['fecha_procesada'] = pd.to_datetime(df['fecha'], format='%d.%m.%Y', errors='coerce')
+            
+            # Remove rows with invalid dates
+            df = df[df['fecha_procesada'].notna()].copy()
+            
+            # Process amounts
+            def process_amount(amount):
+                if pd.isna(amount):
+                    return None
+                if isinstance(amount, (int, float)):
+                    return Decimal(str(abs(float(amount))))
+                amount_str = str(amount).replace(',', '.').replace('-', '').strip()
+                try:
+                    return Decimal(str(abs(float(amount_str))))
+                except:
+                    return None
+            
+            df['importe_procesado'] = df['importe'].apply(process_amount)
+            df = df[df['importe_procesado'].notna()].copy()
+            
+        except Exception as e:
+            logger.error(f"Error processing CSV: {e}")
+            raise ValueError(f"Error al procesar archivo CSV: {e}")
+        
+        # Delete previous transactions for this period
+        deleted_count = self.bank_repo.clear_by_period(period_id)
+        logger.info(f"Deleted {deleted_count} previous transactions for period {period_id}")
+        
+        # Create transaction objects
+        transactions = []
+        upload_date = datetime.now().isoformat()
+        
+        for _, row in df.iterrows():
+            transaction = BankTransaction(
+                date=row['fecha_procesada'].to_pydatetime(),
+                amount=row['importe_procesado'],
+                description=str(row['descripcion']) if pd.notna(row['descripcion']) else None,
+                reference=str(row['metodo']) if pd.notna(row['metodo']) else None,
+                matched_receipt_id=None
+            )
+            transactions.append(transaction)
+        
+        # Bulk insert with worker/period info
+        count = self.bank_repo.bulk_create_with_period(
+            transactions, 
+            worker_id, 
+            period_id, 
+            str(new_csv_path), 
+            upload_date
+        )
+        
+        # Update period with CSV info
+        period_repo.update_csv_upload(period_id, str(new_csv_path), upload_date)
+        
+        logger.info(f"Loaded {count} transactions for period {period_id}")
+        
+        # Run re-matching for all receipts in this period
+        self._rematch_period(period_id)
+        
+        return count
+    
+    def _rematch_period(self, period_id: int):
+        """
+        Re-run matching for all receipts in a period.
+        
+        Args:
+            period_id: Period ID to rematch
+        """
+        # Get all receipts for this period
+        receipts = self.receipt_repo.get_by_period(period_id)
+        
+        # Get all transactions for this period
+        transactions = self.bank_repo.get_by_period(period_id)
+        
+        logger.info(f"Re-matching {len(receipts)} receipts with {len(transactions)} transactions for period {period_id}")
+        
+        # Clear existing matches for this period's receipts
+        for receipt in receipts:
+            existing_match = self.match_repo.get_by_receipt_id(receipt.id)
+            if existing_match:
+                self.match_repo.delete(existing_match.id)
+        
+        # Perform matching
+        for receipt in receipts:
+            match = self.match_receipt_to_transactions(receipt, transactions)
+            if match:
+                self.match_repo.create(match)
+        
+        logger.info(f"Re-matching completed for period {period_id}")
+

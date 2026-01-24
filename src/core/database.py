@@ -195,6 +195,117 @@ class Database:
                 ON processing_queue(status)
             ''')
             
+            # ===== ROC SKINCARE: Multi-worker tables =====
+            
+            # Workers table
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS workers (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    nombre TEXT NOT NULL UNIQUE COLLATE NOCASE,
+                    activo INTEGER DEFAULT 1,
+                    created_at TEXT DEFAULT CURRENT_TIMESTAMP
+                )
+            ''')
+            
+            cursor.execute('''
+                CREATE UNIQUE INDEX IF NOT EXISTS idx_workers_nombre_lower 
+                ON workers(LOWER(nombre))
+            ''')
+            
+            # Periods table
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS periods (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    worker_id INTEGER NOT NULL,
+                    month_year TEXT NOT NULL,
+                    status TEXT DEFAULT 'active',
+                    is_processing_active INTEGER DEFAULT 0,
+                    csv_last_upload TEXT,
+                    csv_file_path TEXT,
+                    closed_at TEXT,
+                    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (worker_id) REFERENCES workers(id) ON DELETE CASCADE,
+                    UNIQUE(worker_id, month_year)
+                )
+            ''')
+            
+            cursor.execute('''
+                CREATE UNIQUE INDEX IF NOT EXISTS idx_periods_processing_active 
+                ON periods(is_processing_active) 
+                WHERE is_processing_active = 1
+            ''')
+            
+            cursor.execute('''
+                CREATE INDEX IF NOT EXISTS idx_periods_worker ON periods(worker_id)
+            ''')
+            
+            cursor.execute('''
+                CREATE INDEX IF NOT EXISTS idx_periods_status ON periods(status)
+            ''')
+            
+            # Period closures table
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS period_closures (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    period_id INTEGER NOT NULL,
+                    closure_date TEXT NOT NULL,
+                    export_path TEXT NOT NULL,
+                    reopened_at TEXT,
+                    reopen_reason TEXT,
+                    stats_snapshot TEXT,
+                    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (period_id) REFERENCES periods(id) ON DELETE CASCADE
+                )
+            ''')
+            
+            cursor.execute('''
+                CREATE INDEX IF NOT EXISTS idx_closures_period ON period_closures(period_id)
+            ''')
+            
+            # User roles table (for future)
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS user_roles (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    username TEXT NOT NULL UNIQUE,
+                    role TEXT NOT NULL,
+                    worker_id INTEGER,
+                    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (worker_id) REFERENCES workers(id)
+                )
+            ''')
+            
+            # ===== Migrations: Add worker_id and period_id to existing tables =====
+            
+            # Add to receipts
+            try:
+                cursor.execute("SELECT worker_id FROM receipts LIMIT 1")
+            except sqlite3.OperationalError:
+                logger.info("Adding worker_id and period_id to receipts table")
+                cursor.execute("ALTER TABLE receipts ADD COLUMN worker_id INTEGER REFERENCES workers(id)")
+                cursor.execute("ALTER TABLE receipts ADD COLUMN period_id INTEGER REFERENCES periods(id)")
+                cursor.execute("CREATE INDEX IF NOT EXISTS idx_receipts_worker ON receipts(worker_id)")
+                cursor.execute("CREATE INDEX IF NOT EXISTS idx_receipts_period ON receipts(period_id)")
+            
+            # Add to bank_transactions
+            try:
+                cursor.execute("SELECT worker_id FROM bank_transactions LIMIT 1")
+            except sqlite3.OperationalError:
+                logger.info("Adding worker_id and period_id to bank_transactions table")
+                cursor.execute("ALTER TABLE bank_transactions ADD COLUMN worker_id INTEGER REFERENCES workers(id)")
+                cursor.execute("ALTER TABLE bank_transactions ADD COLUMN period_id INTEGER REFERENCES periods(id)")
+                cursor.execute("ALTER TABLE bank_transactions ADD COLUMN csv_upload_date TEXT")
+                cursor.execute("ALTER TABLE bank_transactions ADD COLUMN csv_file_path TEXT")
+                cursor.execute("CREATE INDEX IF NOT EXISTS idx_bank_worker ON bank_transactions(worker_id)")
+                cursor.execute("CREATE INDEX IF NOT EXISTS idx_bank_period ON bank_transactions(period_id)")
+            
+            # Add to processing_queue
+            try:
+                cursor.execute("SELECT period_id FROM processing_queue LIMIT 1")
+            except sqlite3.OperationalError:
+                logger.info("Adding period_id to processing_queue table")
+                cursor.execute("ALTER TABLE processing_queue ADD COLUMN period_id INTEGER REFERENCES periods(id)")
+                cursor.execute("CREATE INDEX IF NOT EXISTS idx_queue_period ON processing_queue(period_id)")
+            
             conn.commit()
     
     def execute_script(self, script: str):

@@ -401,6 +401,38 @@ class BackgroundOCRProcessor:
             # Get description from empresa field if available
             description = extracted_data.get('empresa', '') or ''
             
+            # ===== ROC SKINCARE: Multi-worker period support =====
+            # Determine worker and period for this receipt
+            worker_id, period_id = self._get_active_worker_and_period()
+            
+            # If there's an active period, save to period directory
+            if worker_id and period_id:
+                from src.repositories.period_repository import PeriodRepository
+                from src.repositories.worker_repository import WorkerRepository
+                from src.utils.file_helpers import get_period_paths
+                
+                period_repo = PeriodRepository(self.db)
+                worker_repo = WorkerRepository(self.db)
+                
+                period = period_repo.get_by_id(period_id)
+                worker = worker_repo.get_by_id(worker_id)
+                
+                if period and worker:
+                    # Use period-specific result directory
+                    paths = get_period_paths(worker.nombre, period.month_year)
+                    output_dir = paths['result']
+                    output_dir.mkdir(parents=True, exist_ok=True)
+                    
+                    # Regenerate output path with period directory
+                    existing = [f.name for f in output_dir.iterdir() if f.is_file()]
+                    final_name = deduplicar_nombre_archivo(f"{base_name}{img_path.suffix}", existing)
+                    output_path = output_dir / final_name
+                    
+                    # Copy to period result directory
+                    import shutil
+                    shutil.copy2(str(img_path), str(output_path))
+                    logger.debug(f"  ➜ Copied to period result: {output_path}")
+            
             # Create Receipt in database
             receipt = Receipt(
                 file_path=str(output_path),
@@ -414,6 +446,13 @@ class BackgroundOCRProcessor:
             )
             
             saved_receipt = self.receipt_service.create_receipt(receipt)
+            
+            # Link receipt to worker/period if available
+            if worker_id and period_id and saved_receipt:
+                from src.repositories.receipt_repository import ReceiptRepository
+                receipt_repo = ReceiptRepository(self.db)
+                receipt_repo.update_worker_and_period(saved_receipt.id, worker_id, period_id)
+                logger.debug(f"  ➜ Linked receipt to worker {worker_id}, period {period_id}")
             
             # Mark as completed
             self.queue_service.complete_item(item.id)
@@ -561,6 +600,30 @@ Responde SOLO en formato JSON. Omite campos vacíos."""
         """
         logger.info(f"Resource mode changed to: {new_mode}")
         # Note: llama.cpp doesn't support dynamic thread adjustment after initialization
+    
+    def _get_active_worker_and_period(self) -> tuple[Optional[int], Optional[int]]:
+        """
+        Get the currently active worker and period for processing.
+        
+        Returns:
+            Tuple of (worker_id, period_id) or (None, None) if no active period
+        """
+        try:
+            from src.repositories.period_repository import PeriodRepository
+            period_repo = PeriodRepository(self.db)
+            
+            # Get the active processing period
+            active_period = period_repo.get_active_processing_period()
+            
+            if active_period:
+                return (active_period.worker_id, active_period.id)
+            else:
+                logger.debug("No active processing period found")
+                return (None, None)
+                
+        except Exception as e:
+            logger.error(f"Error getting active worker/period: {e}")
+            return (None, None)
     
     def get_stats(self) -> dict:
         """Get processing statistics."""

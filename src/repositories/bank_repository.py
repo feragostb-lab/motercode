@@ -200,3 +200,64 @@ class BankRepository(BaseRepository[BankTransaction]):
         # Bulk insert
         count = self.bulk_create(transactions)
         return count
+    
+    # ===== ROC SKINCARE: Multi-worker methods =====
+    
+    def get_by_period(self, period_id: int) -> List[BankTransaction]:
+        """Get all bank transactions for a period."""
+        with self.db.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                'SELECT * FROM bank_transactions WHERE period_id = ? ORDER BY date DESC',
+                (period_id,)
+            )
+            rows = cursor.fetchall()
+            return [self._row_to_model(row) for row in rows]
+    
+    def get_by_worker(self, worker_id: int) -> List[BankTransaction]:
+        """Get all bank transactions for a worker."""
+        with self.db.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                'SELECT * FROM bank_transactions WHERE worker_id = ? ORDER BY date DESC',
+                (worker_id,)
+            )
+            rows = cursor.fetchall()
+            return [self._row_to_model(row) for row in rows]
+    
+    def clear_by_period(self, period_id: int) -> int:
+        """Clear all bank transactions for a specific period."""
+        with self.db.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute('DELETE FROM bank_transactions WHERE period_id = ?', (period_id,))
+            return cursor.rowcount
+    
+    def bulk_create_with_period(self, transactions: List[BankTransaction], 
+                                worker_id: int, period_id: int, 
+                                csv_file_path: str, csv_upload_date: str) -> int:
+        """Bulk insert transactions with worker/period info (for CSV import)."""
+        with self.db.get_connection() as conn:
+            cursor = conn.cursor()
+            
+            data_list = [(
+                self._format_datetime(t.date),
+                str(t.amount) if t.amount else None,
+                t.description,
+                t.reference,
+                t.receipt_type,
+                t.matched_receipt_id,
+                worker_id,
+                period_id,
+                csv_upload_date,
+                csv_file_path
+            ) for t in transactions]
+            
+            cursor.executemany('''
+                INSERT INTO bank_transactions 
+                (date, amount, description, reference, receipt_type, matched_receipt_id,
+                 worker_id, period_id, csv_upload_date, csv_file_path)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ''', data_list)
+            
+            return cursor.rowcount
+
