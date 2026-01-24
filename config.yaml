@@ -1,0 +1,59 @@
+backup:
+  backup_on_startup: true
+  enabled: true
+  retention_days: 7
+logging:
+  backup_count: 5
+  format: '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+  level: INFO
+  max_file_size_mb: 10
+matching:
+  amount_tolerance: 0.02
+  date_match_exact: true
+notifications:
+  enabled: true
+  notify_on_completion: true
+  notify_on_pause: true
+  notify_on_permanent_failure: true
+paths:
+  backups_dir: ./backups
+  bank_excel: ./img/bankmov/Detalle de Tarjeta.xlsx
+  database: ./receipts.db
+  exports_dir: ./exports
+  input_dir: ./img
+  logs_dir: ./logs
+  output_dir: ./result
+  temp_dir: ./temp
+processor:
+  batch_size: 4096
+  context_size: 32768
+  gpu_layers: 0
+  idle_boost_enabled: true
+  idle_cpu_percent: 95
+  idle_ram_percent: 95
+  idle_threshold_minutes: 5
+  max_cpu_percent: 70
+  max_image_size_kb: 150
+  max_ram_percent: 70
+  max_tokens: 512
+  mmproj_path: ./models/mmproj-Qwen2.5-VL-7B-Instruct-f16.gguf
+  model_path: ./models/Qwen_Qwen2.5-VL-7B-Instruct-Q4_K_M.gguf
+  resource_check_interval_seconds: 5
+  temperature: 0.1
+  threads: 8
+queue:
+  max_attempts: 3
+  retry_backoff_base_minutes: 2
+  warning_threshold: 300
+receipt_types:
+- taxi
+- hotel
+- restaurante
+- parking
+- gasolina
+- alquiler
+- vuelo
+- tren
+- telefono
+- peaje
+- mensajeria

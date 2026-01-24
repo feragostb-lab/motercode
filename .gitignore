@@ -1,0 +1,46 @@
+# Directorios excluidos
+result/
+img/
+logs/
+exports/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+*.egg-info/
+dist/
+build/
+*.egg
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Sistema
+.DS_Store
+Thumbs.db
+
+# Temporales
+temp/
+*.tmp
+
+# Backups
+backups/
+
+# Coverage
+htmlcov/
+.coverage
+.pytest_cache/
+
+# Modelos grandes (GGUF)
+*.gguf
+models/*.gguf
