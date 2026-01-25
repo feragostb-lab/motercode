@@ -381,7 +381,7 @@ class BackgroundOCRProcessor:
             fecha_obj = self._parse_fecha(extracted_data.get('fecha', '01/01/2000'))
             importe_decimal = self._parse_importe(extracted_data.get('total', '0,00'))
             
-            base_name = generar_nombre_archivo(fecha_obj, importe_decimal, receipt_type)
+            base_name = generar_nombre_archivo(fecha_obj, importe_decimal, receipt_type, extension="")
             output_dir = Path(self.config.paths.get('output_dir', './result'))
             output_dir.mkdir(parents=True, exist_ok=True)
             

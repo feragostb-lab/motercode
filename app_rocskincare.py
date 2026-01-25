@@ -305,6 +305,133 @@ def page_csv_upload():
                 st.metric("Sin Match", stats.unmatched_transactions)
 
 
+def page_image_upload():
+    """Image upload page for active period."""
+    st.header("🖼️ Carga de Imágenes")
+    
+    period_repo = st.session_state.period_repo
+    worker_repo = st.session_state.worker_repo
+    config = st.session_state.config
+    
+    # Get active processing period
+    active_period = period_repo.get_active_processing_period()
+    
+    if not active_period:
+        st.warning("⚠️ No hay ningún periodo activo para procesamiento. Activa uno en la página de Periodos.")
+        return
+    
+    # Get worker info
+    worker = worker_repo.get_by_id(active_period.worker_id)
+    
+    st.info(f"📅 Periodo activo: **{format_month_year_display(active_period.month_year)}** - Trabajador: **{worker.nombre}**")
+    
+    # Determine target directory
+    target_dir = Path(f"./workers/{worker.nombre}/{active_period.month_year}/img")
+    target_dir.mkdir(parents=True, exist_ok=True)
+    
+    st.write(f"📁 Las imágenes se guardarán en: `{target_dir}`")
+    
+    # Upload images section
+    st.subheader("📁 Subir Imágenes")
+    
+    uploaded_files = st.file_uploader(
+        "Selecciona imágenes de recibos",
+        type=['jpg', 'jpeg', 'png', 'webp'],
+        accept_multiple_files=True,
+        help="Puedes seleccionar múltiples imágenes a la vez"
+    )
+    
+    if uploaded_files:
+        st.write(f"**{len(uploaded_files)} archivo(s) seleccionado(s)**")
+        
+        # Show preview of files
+        with st.expander("Ver archivos seleccionados", expanded=True):
+            for idx, file in enumerate(uploaded_files, 1):
+                col1, col2, col3 = st.columns([1, 3, 1])
+                with col1:
+                    st.write(f"{idx}.")
+                with col2:
+                    st.write(f"📷 {file.name}")
+                with col3:
+                    st.write(f"{file.size / 1024:.1f} KB")
+        
+        if st.button("🚀 Cargar Imágenes", type="primary"):
+            progress_bar = st.progress(0)
+            status_text = st.empty()
+            
+            success_count = 0
+            error_count = 0
+            errors = []
+            
+            for idx, file in enumerate(uploaded_files):
+                try:
+                    # Update progress
+                    progress = (idx + 1) / len(uploaded_files)
+                    progress_bar.progress(progress)
+                    status_text.text(f"Procesando {idx + 1}/{len(uploaded_files)}: {file.name}")
+                    
+                    # Save file
+                    file_path = target_dir / file.name
+                    
+                    # Check if file already exists
+                    if file_path.exists():
+                        # Add timestamp to avoid overwriting
+                        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                        file_stem = file_path.stem
+                        file_suffix = file_path.suffix
+                        file_path = target_dir / f"{file_stem}_{timestamp}{file_suffix}"
+                    
+                    with open(file_path, 'wb') as f:
+                        f.write(file.getvalue())
+                    
+                    success_count += 1
+                    
+                except Exception as e:
+                    error_count += 1
+                    errors.append(f"{file.name}: {str(e)}")
+            
+            progress_bar.empty()
+            status_text.empty()
+            
+            # Show results
+            if success_count > 0:
+                st.success(f"✅ {success_count} imagen(es) cargada(s) exitosamente en `{target_dir}`")
+            
+            if error_count > 0:
+                st.error(f"❌ {error_count} imagen(es) con errores:")
+                for error in errors:
+                    st.write(f"  - {error}")
+            
+            st.info("💡 **Siguiente paso:** Ve al módulo **OCR Processor** para procesar las imágenes")
+    
+    # Show existing images
+    st.divider()
+    st.subheader("📊 Imágenes en el Directorio")
+    
+    # Count existing images
+    image_extensions = {'.jpg', '.jpeg', '.png', '.webp'}
+    existing_images = [f for f in target_dir.glob('*') if f.suffix.lower() in image_extensions]
+    
+    if existing_images:
+        st.metric("Total de Imágenes", len(existing_images))
+        
+        # Show sample images
+        with st.expander("Ver imágenes", expanded=False):
+            cols = st.columns(4)
+            for idx, img_path in enumerate(existing_images[:12]):  # Show first 12
+                with cols[idx % 4]:
+                    try:
+                        img = Image.open(img_path)
+                        st.image(img, caption=img_path.name, use_column_width=True)
+                    except Exception as e:
+                        st.error(f"Error: {img_path.name}")
+            
+            if len(existing_images) > 12:
+                st.caption(f"... y {len(existing_images) - 12} imágenes más")
+    else:
+        st.info("No hay imágenes en el directorio del periodo activo")
+
+
 def page_period_closure():
     """Period closure and reopening page."""
     st.header("🔒 Cierre de Periodos")
@@ -567,7 +694,7 @@ def main():
     
     page = st.sidebar.radio(
         "Navegación",
-        ["👥 Trabajadores", "📅 Periodos", "📤 Cargar CSV", "🔒 Cierre de Periodos", "📊 Visualización"],
+        ["👥 Trabajadores", "📅 Periodos", "�️ Cargar Imágenes", "📤 Cargar CSV", "🔒 Cierre de Periodos", "📊 Visualización"],
         key='nav_radio'
     )
     
@@ -575,6 +702,7 @@ def main():
     page_map = {
         "👥 Trabajadores": page_workers,
         "📅 Periodos": page_periods,
+        "🖼️ Cargar Imágenes": page_image_upload,
         "📤 Cargar CSV": page_csv_upload,
         "🔒 Cierre de Periodos": page_period_closure,
         "📊 Visualización": page_visualization

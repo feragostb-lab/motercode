@@ -81,7 +81,8 @@ class ReceiptService:
         new_name = generar_nombre_archivo(
             receipt.date,
             receipt.amount,
-            new_type
+            new_type,
+            extension=""
         )
         new_name = f"{new_name}{extension}"
         
@@ -149,7 +150,8 @@ class ReceiptService:
         new_name = generar_nombre_archivo(
             date_for_filename,
             receipt.amount,
-            receipt.receipt_type
+            receipt.receipt_type,
+            extension=""
         )
         new_name = f"{new_name}{extension}"
         
@@ -208,7 +210,8 @@ class ReceiptService:
         new_name = generar_nombre_archivo(
             receipt.date,
             new_amount,
-            receipt.receipt_type
+            receipt.receipt_type,
+            extension=""
         )
         new_name = f"{new_name}{extension}"
         

@@ -1,0 +1,978 @@
+﻿GUÍA DE ESTILOS CSS Y MAQUETACIÓN - ROC SKINCARE
+
+
+Guía completa de estilos, componentes UI y patrones de diseño basada en el análisis exhaustivo del sitio web oficial de RoC Skincare (https://www.rocskincare.com/).
+
+
+──────────────────────────────────────────
+
+
+1. PALETA DE COLORES
+
+
+Colores Primarios:
+
+
+/* Azul Marino Oscuro (Principal) */
+--color-primary: #001E2B;
+--color-primary-dark: #00161F;
+
+
+/* Dorado/Gold (Acento Premium) */
+--color-gold: #C6A052;
+--color-gold-light: #D4B77A;
+
+
+/* Blanco */
+--color-white: #FFFFFF;
+
+
+Colores Secundarios:
+
+
+/* Gris Claro (Fondos) */
+--color-gray-light: #F5F5F5;
+--color-gray-medium: #E8E8E8;
+--color-gray: #6B6B6B;
+--color-gray-dark: #404040;
+
+
+/* Azul Grisáceo (Tonos Suaves) */
+--color-blue-gray: #8CA3B8;
+--color-blue-light: #E6EEF4;
+
+
+Colores de Estado:
+
+
+/* Badges/Etiquetas */
+--color-badge-new: #FFFFFF;
+--color-badge-save: #FFFFFF;
+--color-badge-viral: #000000;
+
+
+/* Fondos de Badge */
+--color-badge-bg-new: transparent;
+--color-badge-bg-save: transparent;
+--color-badge-border: #000000;
+
+
+──────────────────────────────────────────
+
+
+2. TIPOGRAFÍA
+
+
+Fuentes Principales:
+
+
+/* Familia Tipográfica Principal */
+--font-primary: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+
+
+Jerarquía de Tamaños:
+
+
+--font-size-h1: 48px;        /* Hero sections */
+--font-size-h2: 36px;        /* Títulos de sección */
+--font-size-h3: 24px;        /* Títulos de producto */
+--font-size-h4: 20px;        /* Subtítulos */
+--font-size-body: 16px;      /* Texto normal */
+--font-size-small: 14px;     /* Texto secundario */
+--font-size-xs: 12px;        /* Etiquetas pequeñas */
+
+
+Peso de Fuentes:
+
+
+--font-weight-light: 300;
+--font-weight-regular: 400;
+--font-weight-medium: 500;
+--font-weight-bold: 700;
+
+
+Line Height:
+
+
+--line-height-tight: 1.2;
+--line-height-normal: 1.5;
+--line-height-relaxed: 1.8;
+
+
+Letter Spacing:
+
+
+--letter-spacing-tight: -0.02em;
+--letter-spacing-normal: 0;
+--letter-spacing-wide: 0.05em;
+--letter-spacing-wider: 0.1em;
+
+
+Estilos Tipográficos Clave:
+
+
+/* Títulos Hero */
+.hero-title {
+  font-size: var(--font-size-h1);
+  font-weight: var(--font-weight-bold);
+  letter-spacing: var(--letter-spacing-tight);
+  line-height: var(--line-height-tight);
+  text-transform: uppercase;
+  color: var(--color-primary);
+}
+
+
+/* Títulos de Producto */
+.product-title {
+  font-size: var(--font-size-h3);
+  font-weight: var(--font-weight-medium);
+  letter-spacing: var(--letter-spacing-wide);
+  text-transform: uppercase;
+  color: var(--color-primary);
+}
+
+
+/* Texto Descriptivo */
+.description-text {
+  font-size: var(--font-size-body);
+  font-weight: var(--font-weight-regular);
+  line-height: var(--line-height-relaxed);
+  color: var(--color-gray-dark);
+}
+
+
+──────────────────────────────────────────
+
+
+3. SISTEMA DE ESPACIADO
+
+
+Variables de Espaciado:
+
+
+/* Sistema de espaciado base 8px */
+--space-xs: 4px;
+--space-sm: 8px;
+--space-md: 16px;
+--space-lg: 24px;
+--space-xl: 32px;
+--space-2xl: 48px;
+--space-3xl: 64px;
+--space-4xl: 96px;
+
+
+Contenedores:
+
+
+--container-max-width: 1440px;
+--container-padding: 24px;
+
+
+──────────────────────────────────────────
+
+
+4. COMPONENTES UI
+
+
+4.1 BOTONES
+
+
+Botón Primario (Add to Cart):
+
+
+.btn-primary {
+  background-color: var(--color-primary);
+  color: var(--color-white);
+  padding: 16px 32px;
+  font-size: 14px;
+  font-weight: var(--font-weight-bold);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  border: 2px solid var(--color-primary);
+  border-radius: 0;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  width: 100%;
+  text-align: center;
+}
+
+
+.btn-primary:hover {
+  background-color: transparent;
+  color: var(--color-primary);
+}
+
+
+Botón Secundario (Outline):
+
+
+.btn-secondary {
+  background-color: transparent;
+  color: var(--color-primary);
+  padding: 14px 30px;
+  font-size: 14px;
+  font-weight: var(--font-weight-bold);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  border: 2px solid var(--color-primary);
+  border-radius: 0;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+
+.btn-secondary:hover {
+  background-color: var(--color-primary);
+  color: var(--color-white);
+}
+
+
+Botón Shop Pay (Purple):
+
+
+.btn-shop-pay {
+  background-color: #5A31F4;
+  color: var(--color-white);
+  padding: 16px 32px;
+  border-radius: 4px;
+  border: none;
+  width: 100%;
+  font-weight: var(--font-weight-bold);
+  cursor: pointer;
+}
+
+
+4.2 TARJETAS DE PRODUCTO
+
+
+.product-card {
+  background: var(--color-white);
+  padding: 0;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+
+.product-card__image-wrapper {
+  position: relative;
+  overflow: hidden;
+  aspect-ratio: 1;
+  background-color: var(--color-gray-light);
+}
+
+
+.product-card__image {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  transition: transform 0.3s ease;
+}
+
+
+.product-card:hover .product-card__image {
+  transform: scale(1.05);
+}
+
+
+.product-card__badge {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  background: var(--color-white);
+  border: 1px solid var(--color-primary);
+  padding: 6px 12px;
+  font-size: 11px;
+  font-weight: var(--font-weight-bold);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+
+.product-card__title {
+  font-size: 14px;
+  font-weight: var(--font-weight-medium);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-primary);
+  text-align: center;
+  min-height: 40px;
+}
+
+
+.product-card__price {
+  font-size: 18px;
+  font-weight: var(--font-weight-bold);
+  color: var(--color-primary);
+  text-align: center;
+}
+
+
+.product-card__rating {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  margin: var(--space-sm) 0;
+}
+
+
+4.3 NAVEGACIÓN HEADER
+
+
+.header {
+  background-color: var(--color-white);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+
+.header__top-bar {
+  background-color: var(--color-primary);
+  color: var(--color-white);
+  padding: 12px 24px;
+  font-size: 13px;
+  text-align: center;
+  font-weight: var(--font-weight-medium);
+}
+
+
+.header__main {
+  padding: 20px 24px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+
+.header__logo {
+  height: 40px;
+  width: auto;
+}
+
+
+.header__nav {
+  display: flex;
+  gap: var(--space-xl);
+  align-items: center;
+}
+
+
+.header__nav-link {
+  font-size: 14px;
+  font-weight: var(--font-weight-medium);
+  color: var(--color-primary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  text-decoration: none;
+  transition: color 0.3s ease;
+  position: relative;
+}
+
+
+.header__nav-link:hover {
+  color: var(--color-gold);
+}
+
+
+.header__nav-link::after {
+  content: '';
+  position: absolute;
+  bottom: -8px;
+  left: 0;
+  width: 0;
+  height: 2px;
+  background-color: var(--color-gold);
+  transition: width 0.3s ease;
+}
+
+
+.header__nav-link:hover::after {
+  width: 100%;
+}
+
+
+.header__icons {
+  display: flex;
+  gap: var(--space-lg);
+  align-items: center;
+}
+
+
+.header__icon {
+  width: 24px;
+  height: 24px;
+  cursor: pointer;
+  color: var(--color-primary);
+  transition: color 0.3s ease;
+}
+
+
+.header__icon:hover {
+  color: var(--color-gold);
+}
+
+
+.header__cart-count {
+  background-color: var(--color-primary);
+  color: var(--color-white);
+  border-radius: 50%;
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: var(--font-weight-bold);
+  position: absolute;
+  top: -8px;
+  right: -8px;
+}
+
+
+4.4 HERO BANNER
+
+
+.hero {
+  position: relative;
+  width: 100%;
+  min-height: 600px;
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+}
+
+
+.hero__video {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+
+.hero__content {
+  position: relative;
+  z-index: 10;
+  padding: 0 var(--space-3xl);
+  max-width: 600px;
+}
+
+
+.hero__title {
+  font-size: 56px;
+  font-weight: var(--font-weight-bold);
+  color: var(--color-primary);
+  text-transform: uppercase;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+  margin-bottom: var(--space-md);
+}
+
+
+.hero__subtitle {
+  font-size: 24px;
+  font-weight: var(--font-weight-regular);
+  color: var(--color-gray-dark);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: var(--space-xl);
+}
+
+
+.hero__cta {
+  display: inline-block;
+  margin-top: var(--space-xl);
+}
+
+
+4.5 TABS DE CATEGORÍAS
+
+
+.category-tabs {
+  display: flex;
+  gap: var(--space-xl);
+  border-bottom: 2px solid var(--color-gray-medium);
+  margin-bottom: var(--space-2xl);
+}
+
+
+.category-tab {
+  padding: var(--space-md) 0;
+  font-size: 14px;
+  font-weight: var(--font-weight-bold);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--color-gray);
+  cursor: pointer;
+  border: none;
+  background: none;
+  position: relative;
+  transition: color 0.3s ease;
+}
+
+
+.category-tab::after {
+  content: '';
+  position: absolute;
+  bottom: -2px;
+  left: 0;
+  width: 0;
+  height: 2px;
+  background-color: var(--color-primary);
+  transition: width 0.3s ease;
+}
+
+
+.category-tab:hover {
+  color: var(--color-primary);
+}
+
+
+.category-tab--active {
+  color: var(--color-primary);
+}
+
+
+.category-tab--active::after {
+  width: 100%;
+}
+
+
+4.6 FORMULARIOS
+
+
+.form-group {
+  margin-bottom: var(--space-lg);
+}
+
+
+.form-label {
+  display: block;
+  font-size: 14px;
+  font-weight: var(--font-weight-medium);
+  color: var(--color-primary);
+  margin-bottom: var(--space-sm);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+
+.form-input {
+  width: 100%;
+  padding: 14px 16px;
+  font-size: 16px;
+  border: 1px solid var(--color-gray-medium);
+  border-radius: 0;
+  background-color: var(--color-white);
+  color: var(--color-primary);
+  transition: border-color 0.3s ease;
+}
+
+
+.form-input:focus {
+  outline: none;
+  border-color: var(--color-primary);
+}
+
+
+.form-select {
+  width: 100%;
+  padding: 14px 16px;
+  font-size: 16px;
+  border: 1px solid var(--color-gray-medium);
+  border-radius: 0;
+  background-color: var(--color-white);
+  color: var(--color-primary);
+  cursor: pointer;
+  appearance: none;
+}
+
+
+──────────────────────────────────────────
+
+
+5. LAYOUT Y GRID
+
+
+Grid de Productos:
+
+
+.products-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--space-xl);
+  margin: var(--space-2xl) 0;
+}
+
+
+/* Responsive */
+@media (max-width: 1200px) {
+  .products-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+
+@media (max-width: 768px) {
+  .products-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: var(--space-md);
+  }
+}
+
+
+@media (max-width: 480px) {
+  .products-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+
+Contenedor Principal:
+
+
+.container {
+  max-width: var(--container-max-width);
+  margin: 0 auto;
+  padding: 0 var(--container-padding);
+}
+
+
+──────────────────────────────────────────
+
+
+6. BREAKPOINTS RESPONSIVE
+
+
+/* Breakpoints principales */
+--breakpoint-xs: 480px;    /* Móviles pequeños */
+--breakpoint-sm: 768px;    /* Tablets */
+--breakpoint-md: 1024px;   /* Tablets grandes */
+--breakpoint-lg: 1200px;   /* Desktop pequeño */
+--breakpoint-xl: 1440px;   /* Desktop grande */
+
+
+──────────────────────────────────────────
+
+
+7. ANIMACIONES Y TRANSICIONES
+
+
+Transiciones Generales:
+
+
+/* Transiciones estándar */
+--transition-fast: 0.2s ease;
+--transition-normal: 0.3s ease;
+--transition-slow: 0.5s ease;
+
+
+/* Aplicaciones comunes */
+.hover-scale {
+  transition: transform var(--transition-normal);
+}
+
+
+.hover-scale:hover {
+  transform: scale(1.05);
+}
+
+
+.fade-in {
+  animation: fadeIn var(--transition-normal) ease-in;
+}
+
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+
+──────────────────────────────────────────
+
+
+8. PATRONES DE DISEÑO
+
+
+8.1 ESTRUCTURA DE PÁGINA DE PRODUCTO
+
+
+- Galería de imágenes a la izquierda (miniaturas verticales)
+- Información del producto a la derecha
+- Premio/Badge en la esquina superior derecha
+- Título en mayúsculas con letra mediana
+- Precio destacado y grande
+- Rating con estrellas
+- Botón Add to Cart ancho y prominente
+- Botón Shop Pay secundario
+- Opción de Subscribe & Save con checkbox
+- Sección de descripción con acordeones
+- Sección "Pair With" con productos relacionados
+- Reviews con filtros
+
+
+8.2 ESTRUCTURA DE LISTADO DE PRODUCTOS
+
+
+- Título de la colección centrado
+- Descripción breve debajo del título
+- Banner promocional destacado
+- Filtros a la izquierda (Availability, Price)
+- Selector de ordenamiento a la derecha
+- Grid de 4 columnas en desktop
+- Badges en las tarjetas (NEW, SAVE X%, TIKTOK VIRAL)
+- Imagen del producto con hover scale
+- Título del producto centrado
+- Precio centrado
+- Rating con estrellas
+- Botón Add to Cart full width
+
+
+8.3 ESTRUCTURA DE HOMEPAGE
+
+
+- Banner superior con anuncio promocional (fondo oscuro)
+- Header sticky con logo, navegación y iconos
+- Hero banner con video de fondo
+- Tabs de categorías (BEST SELLERS, NEW, EYE CREAMS)
+- Carrusel de productos con flechas de navegación
+- Secciones de contenido split (50/50 imagen-texto)
+- Sección de ofertas exclusivas
+- AI Skin Insight CTA destacado
+- Footer con múltiples columnas
+- Newsletter signup
+- Social media links
+
+
+──────────────────────────────────────────
+
+
+9. PRINCIPIOS DE DISEÑO
+
+
+9.1 JERARQUÍA VISUAL
+
+
+- Los títulos siempre en mayúsculas
+- Uso generoso de espacios en blanco
+- Contenido centrado en la mayoría de casos
+- Jerarquía clara con tamaños de fuente
+- Contraste fuerte entre texto y fondo
+
+
+9.2 CONSISTENCIA
+
+
+- Botones sin border-radius (esquinas cuadradas)
+- Transiciones suaves en todos los elementos interactivos
+- Uso consistente del color dorado para acentos y hovers
+- Tipografía en mayúsculas para navegación y títulos
+- Letter-spacing amplio para textos en mayúsculas
+
+
+9.3 FOTOGRAFÍA
+
+
+- Imágenes de producto sobre fondo neutro/gris claro
+- Fotografías de modelos con iluminación limpia y natural
+- Before/After comparisons con sliders
+- Close-ups de producto con reflejos y detalles
+- Imágenes lifestyle integradas con producto
+
+
+9.4 ICONOGRAFÍA
+
+
+- Iconos minimalistas y lineales
+- Tamaño consistente de 24px para iconos de UI
+- Color principal o gold en hovers
+- Estilo simple y profesional
+
+
+──────────────────────────────────────────
+
+
+10. ELEMENTOS ESPECÍFICOS ROC
+
+
+10.1 BADGES Y ETIQUETAS
+
+
+Tipos de badges:
+- NEW: Borde negro, texto negro, fondo blanco
+- SAVE X%: Borde negro, texto negro, fondo blanco
+- TIKTOK VIRAL: Texto negro, fondo blanco, borde negro
+
+
+Ubicación: Esquina superior derecha de las tarjetas de producto
+
+
+10.2 CALL-TO-ACTIONS PRINCIPALES
+
+
+- SHOP NOW
+- ADD TO CART
+- ANALYZE MY SKIN
+- BUILD MY SET
+- GET REWARDED
+- SUBSCRIBE NOW
+
+
+10.3 MENSAJES CLAVE DE MARCA
+
+
+- "100% CLINICALLY PROVEN"
+- "DERMATOLOGIST RECOMMENDED"
+- "PETA-APPROVED CRUELTY-FREE"
+- "AMERICA'S #1 RETINOL BRAND"
+- "150+ CLINICAL STUDIES"
+- "65+ YEARS OF RESEARCH"
+
+
+──────────────────────────────────────────
+
+
+11. RECOMENDACIONES DE IMPLEMENTACIÓN
+
+
+11.1 ACCESIBILIDAD
+
+
+- Contraste mínimo WCAG AA: 4.5:1 para texto normal
+- Contraste mínimo WCAG AA: 3:1 para texto grande
+- Todos los elementos interactivos deben tener estados :focus visibles
+- Alt text descriptivo en todas las imágenes
+- Navegación por teclado funcional
+- Etiquetas semánticas HTML5
+
+
+11.2 PERFORMANCE
+
+
+- Imágenes optimizadas (WebP con fallback)
+- Lazy loading para imágenes fuera del viewport
+- Minimizar CSS y JavaScript
+- Usar CDN para assets estáticos
+- Implementar caché del navegador
+
+
+11.3 SEO
+
+
+- Estructura de headings jerárquica (H1 > H2 > H3)
+- Meta descriptions únicas por página
+- URLs limpias y descriptivas
+- Schema markup para productos
+- Sitemap XML actualizado
+
+
+11.4 MOBILE-FIRST
+
+
+- Diseñar primero para móviles
+- Touch targets mínimo 44x44px
+- Navegación hamburger en móvil
+- Imágenes responsive con srcset
+- Formularios optimizados para móvil
+
+
+──────────────────────────────────────────
+
+
+12. CHECKLIST DE IMPLEMENTACIÓN
+
+
+ANTES DE LANZAR:
+
+
+☐ Paleta de colores implementada correctamente
+☐ Tipografía consistente en toda la aplicación
+☐ Espaciado sistemático aplicado
+☐ Botones con estilos correctos (primary, secondary)
+☐ Tarjetas de producto con hover effects
+☐ Header sticky funcional
+☐ Footer con todas las secciones
+☐ Grid responsive de productos
+☐ Formularios estilizados
+☐ Badges implementados
+☐ Transiciones suaves
+☐ Imágenes optimizadas
+☐ Responsive en todos los breakpoints
+☐ Accesibilidad verificada
+☐ Performance optimizada
+☐ Cross-browser testing completado
+
+
+──────────────────────────────────────────
+
+
+13. NOTAS FINALES
+
+
+13.1 RESUMEN DE IDENTIDAD VISUAL
+
+
+La identidad visual de RoC Skincare se caracteriza por:
+
+
+- Elegancia premium con paleta azul marino y dorado
+- Diseño limpio y minimalista
+- Fuerte énfasis en credibilidad científica
+- Fotografía profesional de alta calidad
+- Tipografía en mayúsculas para autoridad
+- Espacios en blanco generosos
+- Esquinas cuadradas (sin border-radius)
+- Transiciones suaves y elegantes
+
+
+13.2 DIFERENCIADORES CLAVE
+
+
+1. Respaldo científico prominente (estudios clínicos)
+2. Before/After visual evidence
+3. Dermatologist endorsements
+4. AI Skin Age technology
+5. Subscription model destacado
+6. Social proof (reviews, ratings)
+7. Awards y reconocimientos visibles
+
+
+13.3 RECURSOS ADICIONALES
+
+
+URL del sitio analizado: https://www.rocskincare.com/
+
+
+Páginas clave revisadas:
+- Homepage
+- Página de producto (Derm Correxion Firming Serum Stick)
+- Listado de productos (Best Sellers)
+- About Us / Clinically Proven
+
+
+13.4 CONTACTO Y SOPORTE
+
+
+Para preguntas sobre la implementación de esta guía o actualizaciones, consulta con el equipo de diseño.
+
+
+──────────────────────────────────────────
+
+
+FIN DEL DOCUMENTO
+
+
+Guía creada a partir del análisis exhaustivo del sitio web oficial de RoC Skincare.
+Fecha: Enero 2026
+Versión: 1.0

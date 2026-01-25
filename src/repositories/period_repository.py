@@ -4,7 +4,7 @@ from typing import List, Optional
 import sqlite3
 
 from .base import BaseRepository
-from ..models.domain import Period, PeriodStatus
+from ..models.domain import Period, PeriodStatus, PeriodStats
 from ..utils.formatters import parse_datetime
 
 logger = logging.getLogger(__name__)
@@ -229,5 +229,101 @@ class PeriodRepository(BaseRepository):
         except Exception as e:
             logger.error(f"Error reopening period: {e}")
             return False
+    
+    def get_period_stats(self, period_id: int):
+        """
+        Get comprehensive statistics for a period.
+        
+        Args:
+            period_id: Period ID
+            
+        Returns:
+            PeriodStats object with all statistics
+        """
+        try:
+            with self.db.get_connection() as conn:
+                cursor = conn.cursor()
+                
+                # Get period info
+                period = self.get_by_id(period_id)
+                if not period:
+                    return None
+                
+                # Count total receipts
+                cursor.execute(
+                    "SELECT COUNT(*) FROM receipts WHERE period_id = ?",
+                    (period_id,)
+                )
+                total_receipts = cursor.fetchone()[0]
+                
+                # Count processed receipts (have a type assigned)
+                cursor.execute(
+                    "SELECT COUNT(*) FROM receipts WHERE period_id = ? AND receipt_type IS NOT NULL AND receipt_type <> ''",
+                    (period_id,)
+                )
+                processed_receipts = cursor.fetchone()[0]
+                
+                # Count matched receipts
+                cursor.execute(
+                    """SELECT COUNT(DISTINCT r.id) FROM receipts r
+                       INNER JOIN matches m ON m.receipt_id = r.id
+                       WHERE r.period_id = ?""",
+                    (period_id,)
+                )
+                matched_receipts = cursor.fetchone()[0]
+                
+                # Count conflict receipts
+                cursor.execute(
+                    """SELECT COUNT(DISTINCT r.id) FROM receipts r
+                       INNER JOIN matches m ON m.receipt_id = r.id
+                       WHERE r.period_id = ? AND m.is_conflict = 1""",
+                    (period_id,)
+                )
+                conflict_receipts = cursor.fetchone()[0]
+                
+                # Count total transactions
+                cursor.execute(
+                    "SELECT COUNT(*) FROM bank_transactions WHERE period_id = ?",
+                    (period_id,)
+                )
+                total_transactions = cursor.fetchone()[0]
+                
+                # Count matched transactions
+                cursor.execute(
+                    """SELECT COUNT(DISTINCT bt.id) FROM bank_transactions bt
+                       INNER JOIN matches m ON m.transaction_id = bt.id
+                       WHERE bt.period_id = ?""",
+                    (period_id,)
+                )
+                matched_transactions = cursor.fetchone()[0]
+                
+                # Calculate derived stats
+                unmatched_receipts = total_receipts - matched_receipts
+                unmatched_transactions = total_transactions - matched_transactions
+                
+                # Create stats object
+                stats = PeriodStats(
+                    period_id=period_id,
+                    total_receipts=total_receipts,
+                    processed_receipts=processed_receipts,
+                    matched_receipts=matched_receipts,
+                    unmatched_receipts=unmatched_receipts,
+                    conflict_receipts=conflict_receipts,
+                    conflicts=conflict_receipts,
+                    total_transactions=total_transactions,
+                    matched_transactions=matched_transactions,
+                    unmatched_transactions=unmatched_transactions,
+                    unprocessed_images=0,  # Will be calculated by service if needed
+                    has_csv=bool(period.csv_file_path),
+                    csv_upload_date=period.csv_last_upload,
+                    can_close=(total_receipts > 0 and processed_receipts == total_receipts),
+                    blocking_reasons=[]
+                )
+                
+                return stats
+                
+        except Exception as e:
+            logger.error(f"Error getting period stats: {e}")
+            return None
     
 

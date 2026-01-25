@@ -1,6 +1,23 @@
-# 📊 Sistema de Procesamiento de Recibos con IA
+# 📊 Sistema de Procesamiento de Recibos con IA - Aplicación Unificada
 
 Sistema automatizado para procesar recibos mediante OCR con Vision Language Model (VLM) y gestionar coincidencias con movimientos bancarios.
+
+## 🎯 **NUEVO: Aplicación Unificada**
+
+El sistema ahora incluye una aplicación unificada que integra los tres módulos principales en un solo punto de entrada:
+
+```bash
+streamlit run app.py
+```
+
+**Módulos integrados:**
+- 🖼️ **OCR Processor** - Procesamiento automático de imágenes
+- 📊 **Dashboard** - Revisión y gestión de recibos
+- 👥 **ROC Skincare** - Gestión multi-trabajador/multi-periodo
+
+📖 **Ver [README_UNIFIED.md](README_UNIFIED.md) para la documentación completa de la aplicación unificada.**
+
+---
 
 ## 🌟 Características Principales
 
@@ -19,6 +36,12 @@ Sistema automatizado para procesar recibos mediante OCR con Vision Language Mode
 - **Revisión de Recibos**: Navegación imagen por imagen con edición manual
 - **Estadísticas en Tiempo Real**: Métricas de procesamiento y coincidencias
 - **Exportación**: Excel/CSV con todos los datos
+
+### Gestión Multi-Trabajador (ROC Skincare)
+- **Múltiples Trabajadores**: Gestión independiente por persona
+- **Periodos Mensuales**: Control de periodos separados
+- **CSV Incremental**: Cargas múltiples con re-matching automático
+- **Cierre de Periodos**: Exportación y snapshot de datos
 
 ### Gestión de Datos
 - **Base de Datos SQLite**: Persistencia local sin configuración
@@ -39,20 +62,9 @@ Sistema automatizado para procesar recibos mediante OCR con Vision Language Mode
 - **Python**: 3.9 o superior (3.11+ recomendado)
 - **Dependencias**: Ver `requirements.txt`
 
-## 🚀 Instalación
+## 🚀 Instalación Rápida
 
-### Opción 1: Ejecutables (Usuario Final - Próximamente)
-
-1. Descargar `RecibosSystem.zip`
-2. Extraer en cualquier carpeta
-3. Ejecutar `ConfigSetup.exe` para auto-configuración
-4. Descargar modelos GGUF en carpeta `models/`
-5. Listo para usar:
-   - `RecibosProcessor.exe` - Procesar recibos
-   - `RecibosDashboard.exe` - Revisar resultados
-
-### Opción 2: Desde Código Fuente (Desarrollo)
-
+### Paso 1: Clonar y Preparar Entorno
 ```bash
 # 1. Clonar proyecto
 cd C:\WORKSPACE\gguf
@@ -70,15 +82,14 @@ pip install -r requirements.txt
 # 5. Auto-configuración (detecta hardware)
 python scripts/setup_config.py
 
-# 6. Migrar datos existentes (opcional)
-python scripts/migrate_from_json.py
+# 6. (Opcional) Configurar ROC Skincare
+python scripts/setup_rocskincare.py
 
-# 7. Ejecutar aplicaciones
-streamlit run app_processor.py   # Procesador
-streamlit run app_dashboard.py   # Dashboard
+# 7. Ejecutar aplicación unificada
+streamlit run app.py
 ```
 
-### Descarga de Modelos GGUF
+### Paso 2: Descarga de Modelos GGUF
 
 **Modelos requeridos** (descargar en carpeta `models/`):
 
@@ -93,6 +104,18 @@ models/
 ├── Qwen_Qwen2.5-VL-7B-Instruct-Q4_K_M.gguf
 └── mmproj-Qwen2.5-VL-7B-Instruct-f16.gguf
 ```
+
+### Aplicaciones Legacy (Separadas)
+
+Si prefieres ejecutar las aplicaciones por separado:
+
+```bash
+streamlit run app_processor.py   # Procesador OCR
+streamlit run app_dashboard.py   # Dashboard
+streamlit run app_rocskincare.py  # ROC Skincare
+```
+
+**Recomendación**: Usa `app.py` para una mejor experiencia integrada.
 
 ## 📁 Estructura del Proyecto
 

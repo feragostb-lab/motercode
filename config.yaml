@@ -46,14 +46,23 @@ queue:
   retry_backoff_base_minutes: 2
   warning_threshold: 300
 receipt_types:
-- taxi
-- hotel
-- restaurante
-- parking
-- gasolina
-- alquiler
-- vuelo
-- tren
-- telefono
-- peaje
-- mensajeria
+- Productos competitivos
+- Compra de Productos RoC
+- Vuelos
+- Tren
+- Comidas
+- Taxis
+- Peaje
+- Teléfono/Celular/Internet
+- Hoteles
+- Estacionamiento
+- Coche
+- Entretenimiento
+- Kilometraje
+- Conferencias y Eventos
+- Membresías y Publicaciones
+- Suscripciones
+- Materiales de Oficina
+- Envío Postal
+- Informática
+- Software

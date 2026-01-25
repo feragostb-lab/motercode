@@ -260,7 +260,12 @@ class PeriodStats:
     total_receipts: int = 0
     processed_receipts: int = 0
     matched_receipts: int = 0
+    unmatched_receipts: int = 0
     conflict_receipts: int = 0
+    conflicts: int = 0
+    total_transactions: int = 0
+    matched_transactions: int = 0
+    unmatched_transactions: int = 0
     unprocessed_images: int = 0
     has_csv: bool = False
     csv_upload_date: Optional[datetime] = None
