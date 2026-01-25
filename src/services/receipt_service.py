@@ -7,10 +7,11 @@ from decimal import Decimal
 import shutil
 import os
 
-from ..models.domain import Receipt
+from ..models.domain import Receipt, TypeScoreDetail
 from ..repositories.receipt_repository import ReceiptRepository
 from ..utils.formatters import generar_nombre_archivo, deduplicar_nombre_archivo
 from ..core.database import get_database
+from ..services.config_service import ConfigService
 
 logger = logging.getLogger(__name__)
 
@@ -29,6 +30,10 @@ class ReceiptService:
         self.db = get_database(config.paths.get('database', './receipts.db'))
         self.repository = ReceiptRepository(self.db)
         self.output_dir = Path(config.paths.get('output_dir', './result'))
+        self.config_service = ConfigService()
+        
+        # Cached scoring rules (invalidated on config reload)
+        self._cached_scoring_rules: Optional[Dict[str, Any]] = None
     
     def create_receipt(self, receipt: Receipt) -> Receipt:
         """
@@ -259,150 +264,197 @@ class ReceiptService:
         receipt.description = new_description
         return self.repository.update(receipt)
     
+    def _compile_scoring_rules(self) -> Dict[str, Any]:
+        """
+        Compile scoring rules from configuration for caching.
+        
+        Returns:
+            Dictionary of compiled scoring rules per type
+        """
+        enabled_types = self.config_service.get_enabled_type_definitions()
+        
+        scoring_rules = {}
+        for type_def in enabled_types:
+            scoring_rules[type_def.name] = {
+                'direct_indicator': type_def.direct_indicator,
+                'auxiliary_fields': type_def.auxiliary_fields,
+                'keyword_weights': type_def.keyword_weights,
+                'max_score': type_def.calculate_max_score()
+            }
+        
+        logger.info(f"Compiled scoring rules for {len(scoring_rules)} enabled types")
+        return scoring_rules
+    
+    def invalidate_scoring_cache(self):
+        """Invalidate cached scoring rules (call after config reload)."""
+        self._cached_scoring_rules = None
+        logger.info("Scoring rules cache invalidated")
+    
     def deduce_receipt_type(self, extracted_data: Dict[str, Any]) -> str:
         """
-        Deduce receipt type from extracted data based on specific keywords and patterns.
-        Uses field presence to determine the most likely receipt category.
+        Deduce receipt type from extracted data using config-driven scoring.
+        Uses cached scoring rules for performance - invalidated on config reload.
         
         Args:
             extracted_data: Dictionary with extracted OCR data
             
         Returns:
-            Deduced receipt type (taxi, hotel, parking, restaurante, gasolina, etc.)
+            Deduced receipt type name or 'Otros'
         """
         if not extracted_data:
-            return 'otros'
+            return 'Otros'
+        
+        # Ensure scoring rules are compiled and cached
+        if self._cached_scoring_rules is None:
+            self._cached_scoring_rules = self._compile_scoring_rules()
         
         # Convert all keys to lowercase for case-insensitive matching
         data_lower = {k.lower(): v for k, v in extracted_data.items() if v}
         
-        # Count specific indicators for each type (more specific = higher priority)
+        # Calculate scores for all types
+        type_scores = {}
         
-# "restaurcion": "Indica si el recibo es de restaurante/comida",
-#   "parking": "Indica si el recibo es de parking",
-#   "gasolina": "Indica si el recibo es de repostaje de gasolina o gasóleo",
-#   "taxi": "Indica si el recibo es de taxi, uber o similar",
-#   "hotel": "Indica si el recibo es de hotel",
-#   "peaje": "Indica si el recibo es de peaje de autopista",
-#   "vuelo": "Indica si el recibo es de vuelo aéreo",
-#   "tren": "Indica si el recibo es de billete de tren",
-#   "telefono": "Indica si el recibo es de factura de teléfono",
-#   "alquiler_coche": "Indica si el recibo es de alquiler de coche",
-#   "mensajeria": "Indica si el recibo es de mensajería o envío"
-
-
-        # TAXI / UBER - Check for transport-specific fields
-        taxi_fields = ['origen', 'destino', 'distancia', 'licencia', 'matricula', 'taximetro']
-        taxi_score = sum(1 for field in taxi_fields if field in data_lower)
-        taxi_score += sum(5 for key in data_lower if 'taxi' in key)
-
-        # HOTEL - Check for hotel-specific fields
-        hotel_fields = ['nombre_hotel', 'cliente', 'llegada', 'salida', 'habitacion', 'check_in', 'check_out']
-        hotel_score = sum(1 for field in hotel_fields if field in data_lower)
-        hotel_score += sum(5 for key in data_lower if 'hotel' in key)
-
-        # RESTAURANTE / COMIDA - Check for restaurant-specific fields
-        restaurant_fields = ['nombre_restaurante', 'camarero', 'cubiertos', 'comensales', 'mesa','hotel']
-        restaurant_score = sum(1 for field in restaurant_fields if field in data_lower)
-        restaurant_score += sum(hotel_score for key in data_lower if 'restaurante' in key)
+        for type_name, rules in self._cached_scoring_rules.items():
+            score = 0
+            
+            # PRIMARY SCORE: Direct indicator field presence
+            direct_indicator = rules.get('direct_indicator', {})
+            if direct_indicator:
+                field_key = direct_indicator.get('field_key', '').lower()
+                weight = direct_indicator.get('weight', 0)
+                if field_key in data_lower:
+                    score += weight
+            
+            # SECONDARY SCORE: Auxiliary field presence
+            auxiliary_fields = rules.get('auxiliary_fields', {})
+            for field_key, field_config in auxiliary_fields.items():
+                if field_key.lower() in data_lower:
+                    score += field_config.get('weight', 0)
+            
+            # TERTIARY SCORE: Keyword matching in extracted field keys
+            keyword_weights = rules.get('keyword_weights', {})
+            for keyword, weight in keyword_weights.items():
+                keyword_lower = keyword.lower()
+                # Check if keyword appears in any extracted field key
+                if any(keyword_lower in key for key in data_lower.keys()):
+                    score += weight
+            
+            type_scores[type_name] = score
         
-
-        # PARKING - Check for parking-specific fields
-        parking_fields = ['ciudad_parking', 'matricula','origen','parking', 'estacionamiento', 'zona_parking']
-        parking_score = sum(1 for field in parking_fields if field in data_lower)
-        parking_score += sum(5 for key in data_lower if 'parking' in key)
+        # Find type with highest score
+        if type_scores:
+            max_score = max(type_scores.values())
+            if max_score > 0:
+                # Get all types with max score (tie-breaking by YAML order)
+                for type_name in self._cached_scoring_rules.keys():
+                    if type_scores.get(type_name, 0) == max_score:
+                        logger.debug(f"Deduced type '{type_name}' with score {max_score}")
+                        logger.debug(f"All scores: {type_scores}")
+                        return type_name
         
-        # GASOLINA - Check for gas station-specific fields
-        gasolina_fields = ['litros_combustible', 'combustible', 'litros', 'gasolinera']
-        gasolina_score = sum(1 for field in gasolina_fields if field in data_lower)
-        gasolina_score += sum(5 for key in data_lower if 'gasolina' in key or 'diesel' in key)
-        
-        # ALQUILER COCHE - Check for car rental-specific fields
-        alquiler_fields = ['empresa_alquiler', 'rental', 'alquiler_coche']
-        alquiler_score = sum(1 for field in alquiler_fields if field in data_lower)
-        alquiler_score += sum(5 for key in data_lower if 'alquiler' in key or 'rental' in key)
-
-        # VUELO - Check for flight-specific fields
-        vuelo_fields = ['compañia_aerea', 'compania_aerea', 'vuelo', 'flight', 'aeropuerto', 'boarding']
-        common_airlines = ['iberia', 'vueling', 'ryanair', 'easyjet', 'air europa', 'lufthansa', 'british airways']
-        #si el campo empresa en data_lower contiene uno de los nombres de aerolineas comunes, aumentar el puntaje
-        vuelo_score = sum(1 for field in vuelo_fields if field in data_lower)
-        if 'empresa' in data_lower:
-            empresa_value = str(data_lower['empresa']).lower()
-            if any(airline in empresa_value for airline in common_airlines):
-                vuelo_score += 5
-        vuelo_score += sum(5 for key in data_lower if 'vuelo' in key or 'flight' in key)
-
-
-        # TREN - Check for train-specific fields
-        tren_fields = ['empresa_ferroviaria', 'tren', 'train', 'estacion', 'renfe']
-        tren_score = sum(1 for field in tren_fields if field in data_lower)
-        tren_score += sum(5 for key in data_lower if 'tren' in key or 'train' in key)
-
-        # TELÉFONO - Check for phone service-specific fields
-        telefono_fields = ['compañia_telefonia', 'compania_telefonia', 'telefono', 'movil', 'linea']
-        telefono_score = sum(1 for field in telefono_fields if field in data_lower)
-        telefono_score += sum(5 for key in data_lower if 'telefono' in key or 'telefonia' in key)
-
-        # PEAJE - Check for toll-specific fields
-        peaje_fields = ['clase', 'autopista']
-        peaje_score = sum(1 for field in peaje_fields if field in data_lower)
-        peaje_score += sum(5 for key in data_lower if 'peaje' in key or 'autopista' in key)
-        
-        # MENSAJERÍA / ENVÍO - Check for shipping-specific fields
-        mensajeria_fields = ['empresa_mensajeria', 'envio', 'mensajeria', 'courier']
-        mensajeria_score = sum(1 for field in mensajeria_fields if field in data_lower)
-        mensajeria_score += sum(5 for key in data_lower if 'mensajeria' in key or 'envio' in key or 'courier' in key)
-
-        
-        # Create scores dictionary
-        scores = {
-            'taxi': taxi_score,
-            'hotel': hotel_score,
-            'restaurante': restaurant_score,
-            'parking': parking_score,
-            'gasolina': gasolina_score,
-            'alquiler': alquiler_score,
-            'vuelo': vuelo_score,
-            'tren': tren_score,
-            'telefono': telefono_score,
-            'peaje': peaje_score,
-            'mensajeria': mensajeria_score,
-        }
-        print("Scores:", scores)
-        # Find the category with the highest score
-        max_score = max(scores.values())
-        
-        # If we have a clear match (score > 0), return it
-        if max_score > 0:
-            # Get all categories with max score
-            top_categories = [cat for cat, score in scores.items() if score == max_score]
-            # Return the first one (if tied, priority by order)
-            print("Top categories:", top_categories)
-            return top_categories[0]
-        
-        # Fallback: Check for invoice/factura based on NIF/CIF presence
+        # Fallback: Check for generic invoice indicators
         if 'nif' in data_lower or 'cif' in data_lower or 'numero_factura' in data_lower:
-            return 'factura'
+            logger.debug("No type match, falling back to 'Otros' (found invoice indicators)")
+            return 'Otros'
         
-        # Last resort: check text content for keywords
+        # Last resort: text-based keyword search in values
         all_text = ' '.join(str(v).lower() for v in data_lower.values() if v)
         
-        if any(word in all_text for word in ['taxi', 'uber', 'cabify']):
-            return 'taxi'
-        if any(word in all_text for word in ['hotel', 'hospedaje', 'alojamiento']):
-            return 'hotel'
-        if any(word in all_text for word in ['restaurante', 'bar', 'cafeteria', 'restaurant']):
-            return 'restaurante'
-        if any(word in all_text for word in ['parking', 'aparcamiento', 'estacionamiento']):
-            return 'parking'
-        if any(word in all_text for word in ['gasolina', 'combustible', 'fuel', 'gasolinera']):
-            return 'gasolina'
-        if any(word in all_text for word in ['factura', 'invoice']):
-            return 'factura'
+        # Try to match against keyword_weights from all types
+        for type_name, rules in self._cached_scoring_rules.items():
+            keyword_weights = rules.get('keyword_weights', {})
+            for keyword in keyword_weights.keys():
+                if keyword.lower() in all_text:
+                    logger.debug(f"Text fallback matched type '{type_name}' via keyword '{keyword}'")
+                    return type_name
         
-        # Default to 'otros' if no match found
-        return 'otros'
+        logger.debug(f"No type match found, defaulting to 'Otros'. Scores: {type_scores}")
+        return 'Otros'
+    
+    def calculate_type_scores_detailed(self, extracted_data: Dict[str, Any]) -> Dict[str, TypeScoreDetail]:
+        """
+        Calculate detailed scoring breakdown for all types.
+        Used for live preview in admin UI.
+        
+        Args:
+            extracted_data: Dictionary with extracted OCR data
+            
+        Returns:
+            Dictionary mapping type name to TypeScoreDetail object
+        """
+        if not extracted_data:
+            return {}
+        
+        # Ensure scoring rules are compiled and cached
+        if self._cached_scoring_rules is None:
+            self._cached_scoring_rules = self._compile_scoring_rules()
+        
+        # Convert all keys to lowercase for case-insensitive matching
+        data_lower = {k.lower(): v for k, v in extracted_data.items() if v}
+        
+        detailed_scores = {}
+        
+        for type_name, rules in self._cached_scoring_rules.items():
+            primary_score = 0
+            secondary_score = 0
+            tertiary_score = 0
+            matched_fields = []
+            
+            # PRIMARY: Direct indicator
+            direct_indicator = rules.get('direct_indicator', {})
+            if direct_indicator:
+                field_key = direct_indicator.get('field_key', '').lower()
+                weight = direct_indicator.get('weight', 0)
+                if field_key in data_lower:
+                    primary_score += weight
+                    matched_fields.append({
+                        'field': field_key,
+                        'weight': weight,
+                        'tier': 'PRIMARY'
+                    })
+            
+            # SECONDARY: Auxiliary fields
+            auxiliary_fields = rules.get('auxiliary_fields', {})
+            for field_key, field_config in auxiliary_fields.items():
+                if field_key.lower() in data_lower:
+                    weight = field_config.get('weight', 0)
+                    secondary_score += weight
+                    matched_fields.append({
+                        'field': field_key,
+                        'weight': weight,
+                        'tier': 'SECONDARY'
+                    })
+            
+            # TERTIARY: Keywords
+            keyword_weights = rules.get('keyword_weights', {})
+            for keyword, weight in keyword_weights.items():
+                keyword_lower = keyword.lower()
+                if any(keyword_lower in key for key in data_lower.keys()):
+                    tertiary_score += weight
+                    matched_fields.append({
+                        'field': f"keyword:{keyword}",
+                        'weight': weight,
+                        'tier': 'TERTIARY'
+                    })
+            
+            total_score = primary_score + secondary_score + tertiary_score
+            max_score = rules.get('max_score', 0)
+            
+            detail = TypeScoreDetail(
+                type_name=type_name,
+                total_score=total_score,
+                max_score=max_score,
+                primary_score=primary_score,
+                secondary_score=secondary_score,
+                tertiary_score=tertiary_score,
+                matched_fields=matched_fields,
+                has_test_samples=False,  # Will be set by admin UI
+                avg_confidence=0.0  # Will be calculated by admin UI
+            )
+            
+            detailed_scores[type_name] = detail
+        
+        return detailed_scores
     
     def update_receipt_type_simple(self, receipt_id: int, new_type: str) -> bool:
         """

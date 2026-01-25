@@ -40,6 +40,12 @@ def render():
     queue_service = st.session_state.queue_service
     config = st.session_state.config
     
+    # Check for failed items and show warning
+    queue_stats = queue_service.get_queue_stats()
+    failed_count = queue_stats.get('failed', 0)
+    if failed_count > 0:
+        st.warning(f"⚠️ Hay {failed_count} items fallidos. [Ir a Items Fallidos](javascript:void(0))", icon="⚠️")
+    
     # Main layout
     col1, col2 = st.columns([2, 1])
     
@@ -237,7 +243,16 @@ def render():
         st.metric("Pending", queue_stats.get('pending', 0))
         st.metric("Processing", queue_stats.get('processing', 0))
         st.metric("Completed", queue_stats.get('completed', 0))
-        st.metric("Failed", queue_stats.get('failed', 0))
+        
+        # Failed items with link
+        failed_count = queue_stats.get('failed', 0)
+        if failed_count > 0:
+            st.metric("Failed", failed_count)
+            if st.button("🔍 Ver Fallidos", use_container_width=True, type="secondary"):
+                st.session_state.sub_page = "❌ Items Fallidos"
+                st.rerun()
+        else:
+            st.metric("Failed", 0)
         
         st.divider()
         

@@ -172,3 +172,14 @@ class QueueRepository(BaseRepository[ProcessingQueueItem]):
             cursor = conn.cursor()
             cursor.execute("DELETE FROM processing_queue WHERE status = 'completed'")
             return cursor.rowcount
+    
+    def get_failed_items(self) -> List[ProcessingQueueItem]:
+        """Get all failed items."""
+        with self.db.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute('''
+                SELECT * FROM processing_queue 
+                WHERE status = 'failed'
+                ORDER BY processed_at DESC
+            ''')
+            return [self._row_to_model(row) for row in cursor.fetchall()]

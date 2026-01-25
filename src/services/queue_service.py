@@ -163,3 +163,45 @@ class QueueService:
             Number of items removed
         """
         return self.repository.clear_completed()
+    
+    def get_failed_items(self):
+        """
+        Get all failed items.
+        
+        Returns:
+            List of failed queue items
+        """
+        return self.repository.get_failed_items()
+    
+    def retry_failed_item(self, item_id: int) -> bool:
+        """
+        Manually retry a failed item by resetting it to pending.
+        
+        Args:
+            item_id: Queue item ID
+            
+        Returns:
+            True if successful
+        """
+        # Reset to pending status for retry
+        success = self.repository.reset_to_pending(item_id)
+        if success:
+            logger.info(f"Item {item_id} manually reset to pending for retry")
+        return success
+    
+    def retry_all_failed_items(self) -> int:
+        """
+        Retry all failed items.
+        
+        Returns:
+            Number of items reset
+        """
+        failed_items = self.repository.get_failed_items()
+        count = 0
+        for item in failed_items:
+            if self.repository.reset_to_pending(item.id):
+                count += 1
+        
+        if count > 0:
+            logger.info(f"Manually reset {count} failed items to pending for retry")
+        return count

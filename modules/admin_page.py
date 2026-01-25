@@ -4,9 +4,13 @@ from pathlib import Path
 import shutil
 from datetime import datetime
 import sqlite3
+import json
+import tempfile
 
 from src.core.database import get_database, Database
 from src.core.backup_manager import BackupManager
+from src.services.config_service import ConfigService
+from src.models.domain import TypeScoreDetail
 
 
 def render():
@@ -262,3 +266,500 @@ def render():
                 st.success(f"✅ Backup creado: {backup_path}")
             except Exception as e:
                 st.error(f"❌ Error al crear backup: {e}")
+    
+    st.divider()
+    
+    # Receipt Types Configuration
+    render_receipt_types_config()
+
+
+def render_receipt_types_config():
+    """Render receipt types configuration section."""
+    st.subheader("📝 Configuración de Tipos de Recibo")
+    
+    st.info(
+        "💡 **Recomendación:** Exporta manualmente la configuración antes de realizar cambios importantes. "
+        "Usa la función Importar/Exportar para guardar versiones de tu configuración."
+    )
+    
+    # Initialize config service
+    if 'config_service' not in st.session_state:
+        st.session_state.config_service = ConfigService()
+    
+    config_service = st.session_state.config_service
+    
+    # Auto-backup settings
+    col1, col2, col3, col4 = st.columns([2, 2, 2, 2])
+    
+    with col1:
+        auto_backup = st.toggle(
+            "Auto-backup al guardar",
+            value=True,
+            help="Crear backup automático antes de guardar cambios"
+        )
+    
+    with col2:
+        retention_days = st.number_input(
+            "Días de retención",
+            min_value=1,
+            max_value=365,
+            value=30,
+            help="Días para mantener backups antiguos"
+        )
+    
+    with col3:
+        if st.button("🔄 Reconstruir Caché", help="Recargar configuración y limpiar cachés"):
+            config_service.rebuild_cache()
+            st.success("✅ Caché reconstruida")
+            st.rerun()
+    
+    with col4:
+        if st.button("📖 Ver Librería de Campos"):
+            st.session_state.show_field_library = not st.session_state.get('show_field_library', False)
+    
+    # Field library documentation
+    if st.session_state.get('show_field_library', False):
+        with st.expander("📚 Librería de Campos Disponibles", expanded=True):
+            field_library = config_service.get_field_library()
+            
+            if field_library:
+                st.markdown("**Campos reutilizables disponibles para configuración de tipos:**")
+                st.caption("Edita estos campos directamente en config.yaml")
+                
+                # Create DataFrame for display
+                library_data = []
+                for field_key, field_config in sorted(field_library.items()):
+                    library_data.append({
+                        'Campo': f"`{field_key}`",
+                        'Tipo': field_config.get('type', 'text'),
+                        'Pregunta': field_config.get('question', ''),
+                        'Ayuda': field_config.get('help', '')
+                    })
+                
+                st.dataframe(library_data, use_container_width=True, hide_index=True)
+            else:
+                st.info("No hay campos en la librería")
+    
+    # Import/Export section
+    col_exp1, col_exp2 = st.columns(2)
+    
+    with col_exp1:
+        if st.button("📤 Exportar Configuración (JSON)"):
+            with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
+                success = config_service.export_to_json(f.name)
+                if success:
+                    with open(f.name, 'r', encoding='utf-8') as rf:
+                        json_data = rf.read()
+                    st.download_button(
+                        label="⬇️ Descargar JSON",
+                        data=json_data,
+                        file_name=f"receipt_types_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json",
+                        mime="application/json"
+                    )
+    
+    with col_exp2:
+        uploaded_file = st.file_uploader(
+            "📥 Importar Configuración",
+            type=['json', 'yaml', 'yml'],
+            help="Importar tipos desde archivo JSON o YAML"
+        )
+        
+        if uploaded_file is not None:
+            with tempfile.NamedTemporaryFile(mode='wb', suffix=uploaded_file.name, delete=False) as f:
+                f.write(uploaded_file.getvalue())
+                temp_path = f.name
+            
+            success, error_msg = config_service.import_from_file(temp_path)
+            
+            if success:
+                st.success("✅ Configuración importada correctamente")
+                st.rerun()
+            else:
+                st.error(f"❌ Error al importar: {error_msg}")
+    
+    st.divider()
+    
+    # Types list
+    st.subheader("📋 Tipos Configurados")
+    
+    type_definitions = config_service.get_type_definitions()
+    
+    # Summary stats
+    enabled_count = sum(1 for t in type_definitions if t.enabled)
+    disabled_count = len(type_definitions) - enabled_count
+    
+    col_stat1, col_stat2, col_stat3 = st.columns(3)
+    col_stat1.metric("Total de Tipos", len(type_definitions))
+    col_stat2.metric("Habilitados", enabled_count)
+    col_stat3.metric("Deshabilitados", disabled_count)
+    
+    # Types table
+    for idx, type_def in enumerate(type_definitions):
+        with st.expander(
+            f"{'✅' if type_def.enabled else '❌'} **{type_def.name}** "
+            f"(Max Score: {type_def.calculate_max_score()})",
+            expanded=False
+        ):
+            render_type_editor(type_def, idx, config_service)
+    
+    # Add new type
+    st.divider()
+    
+    if st.button("➕ Añadir Nuevo Tipo"):
+        st.session_state.adding_new_type = True
+    
+    if st.session_state.get('adding_new_type', False):
+        render_new_type_form(config_service, type_definitions)
+
+
+def render_type_editor(type_def, idx, config_service):
+    """Render editor for a single receipt type."""
+    col1, col2 = st.columns([3, 1])
+    
+    with col1:
+        new_name = st.text_input(
+            "Nombre del Tipo",
+            value=type_def.name,
+            max_chars=30,
+            key=f"name_{idx}",
+            help="Máximo 30 caracteres. NOTA: Renombrar crea un NUEVO tipo sin migrar recibos existentes."
+        )
+    
+    with col2:
+        enabled = st.toggle(
+            "Habilitado",
+            value=type_def.enabled,
+            key=f"enabled_{idx}"
+        )
+    
+    st.write("**Indicador Directo** (Pregunta principal - peso recomendado: 8-15)")
+    
+    col_di1, col_di2, col_di3 = st.columns([2, 3, 1])
+    
+    with col_di1:
+        di_field = st.text_input(
+            "Campo clave",
+            value=type_def.direct_indicator.get('field_key', ''),
+            key=f"di_field_{idx}"
+        )
+    
+    with col_di2:
+        di_question = st.text_input(
+            "Pregunta",
+            value=type_def.direct_indicator.get('question', ''),
+            key=f"di_question_{idx}"
+        )
+    
+    with col_di3:
+        di_weight = st.number_input(
+            "Peso",
+            min_value=0,
+            value=type_def.direct_indicator.get('weight', 10),
+            key=f"di_weight_{idx}",
+            help="Recomendado: 8-15"
+        )
+        
+        if di_weight < 5:
+            st.warning("⚠️ Peso bajo")
+    
+    st.write("**Campos Auxiliares** (Peso recomendado: 1-3 por campo)")
+    
+    # Display existing auxiliary fields
+    aux_fields = type_def.auxiliary_fields.copy()
+    
+    fields_to_delete = []
+    
+    for field_idx, (field_key, field_config) in enumerate(aux_fields.items()):
+        col_f1, col_f2, col_f3, col_f4, col_f5, col_f6 = st.columns([2, 3, 1, 1, 2, 1])
+        
+        with col_f1:
+            st.text_input(
+                "Campo",
+                value=field_key,
+                key=f"aux_field_{idx}_{field_idx}",
+                disabled=True
+            )
+        
+        with col_f2:
+            st.text_input(
+                "Pregunta",
+                value=field_config.get('question', ''),
+                key=f"aux_q_{idx}_{field_idx}",
+                disabled=True
+            )
+        
+        with col_f3:
+            st.number_input(
+                "Peso",
+                value=field_config.get('weight', 1),
+                key=f"aux_w_{idx}_{field_idx}",
+                disabled=True
+            )
+        
+        with col_f4:
+            st.selectbox(
+                "Tipo",
+                ['text', 'number', 'date', 'boolean'],
+                index=['text', 'number', 'date', 'boolean'].index(field_config.get('type', 'text')),
+                key=f"aux_t_{idx}_{field_idx}",
+                disabled=True
+            )
+        
+        with col_f5:
+            st.text_input(
+                "Ayuda",
+                value=field_config.get('help', ''),
+                key=f"aux_h_{idx}_{field_idx}",
+                disabled=True
+            )
+        
+        with col_f6:
+            if st.button("🗑️", key=f"del_aux_{idx}_{field_idx}"):
+                fields_to_delete.append(field_key)
+    
+    st.caption("📝 Para editar campos, modifica directamente el archivo config.yaml o usa Importar/Exportar")
+    
+    st.write("**Palabras Clave** (Peso recomendado: 3-8 por palabra)")
+    
+    keywords = type_def.keyword_weights.copy()
+    
+    for kw_idx, (keyword, weight) in enumerate(keywords.items()):
+        col_kw1, col_kw2 = st.columns([3, 1])
+        
+        with col_kw1:
+            st.text_input(
+                "Palabra clave",
+                value=keyword,
+                key=f"kw_{idx}_{kw_idx}",
+                disabled=True
+            )
+        
+        with col_kw2:
+            st.number_input(
+                "Peso",
+                value=weight,
+                key=f"kw_w_{idx}_{kw_idx}",
+                disabled=True
+            )
+    
+    st.caption("📝 Para modificar palabras clave, edita config.yaml")
+    
+    # Delete type
+    st.divider()
+    
+    if st.button(f"🗑️ Eliminar Tipo '{type_def.name}'", key=f"delete_{idx}", type="secondary"):
+        st.session_state[f'confirm_delete_{idx}'] = True
+    
+    if st.session_state.get(f'confirm_delete_{idx}', False):
+        st.warning(f"⚠️ ¿Estás seguro de eliminar el tipo **{type_def.name}**?")
+        
+        # Check if there are receipts with this type
+        db = st.session_state.database
+        with db.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT COUNT(*) FROM receipts WHERE receipt_type = ?", (type_def.name,))
+            receipt_count = cursor.fetchone()[0]
+        
+        if receipt_count > 0:
+            st.error(f"⚠️ Hay {receipt_count} recibos con este tipo")
+            
+            # Offer reclassification
+            other_types = [t.name for t in config_service.get_type_definitions() if t.name != type_def.name]
+            
+            new_type = st.selectbox(
+                "Reclasificar a:",
+                options=other_types,
+                key=f"reclassify_{idx}"
+            )
+            
+            if st.button(f"✅ Confirmar eliminación y reclasificar", key=f"confirm_del_{idx}"):
+                # Update receipts
+                with db.get_connection() as conn:
+                    cursor = conn.cursor()
+                    cursor.execute(
+                        "UPDATE receipts SET receipt_type = ? WHERE receipt_type = ?",
+                        (new_type, type_def.name)
+                    )
+                    conn.commit()
+                
+                # Disable type (soft delete)
+                all_types = config_service.get_type_definitions()
+                for t in all_types:
+                    if t.name == type_def.name:
+                        t.enabled = False
+                
+                type_defs_data = [t.to_dict() for t in all_types]
+                success, error = config_service.save_type_definitions(type_defs_data)
+                
+                if success:
+                    st.success(f"✅ Tipo eliminado y {receipt_count} recibos reclasificados")
+                    del st.session_state[f'confirm_delete_{idx}']
+                    st.rerun()
+                else:
+                    st.error(f"❌ Error: {error}")
+        else:
+            if st.button(f"✅ Confirmar eliminación", key=f"confirm_del_no_receipts_{idx}"):
+                # Disable type
+                all_types = config_service.get_type_definitions()
+                for t in all_types:
+                    if t.name == type_def.name:
+                        t.enabled = False
+                
+                type_defs_data = [t.to_dict() for t in all_types]
+                success, error = config_service.save_type_definitions(type_defs_data)
+                
+                if success:
+                    st.success("✅ Tipo eliminado")
+                    del st.session_state[f'confirm_delete_{idx}']
+                    st.rerun()
+                else:
+                    st.error(f"❌ Error: {error}")
+
+
+def render_new_type_form(config_service, existing_types):
+    """Render form for adding a new receipt type."""
+    st.subheader("➕ Crear Nuevo Tipo")
+    
+    # Clone from template
+    template_names = [t.name for t in existing_types]
+    clone_from = st.selectbox(
+        "Clonar desde plantilla (opcional)",
+        options=["-- Tipo vacío --"] + template_names,
+        key="clone_template"
+    )
+    
+    st.write("**Nota:** Actualmente solo se puede crear la estructura básica. "
+             "Para añadir campos auxiliares y palabras clave, edita config.yaml después de crear el tipo.")
+    
+    if st.button("❌ Cancelar"):
+        st.session_state.adding_new_type = False
+        st.rerun()
+    
+    st.caption("💡 Después de crear el tipo base, puedes editarlo en config.yaml para añadir campos auxiliares completos")
+
+
+def render_receipt_types_config():
+    """Render receipt types configuration section."""
+    st.subheader("📝 Configuración de Tipos de Recibo")
+    
+    st.info(
+        "💡 **Gestión de tipos:** Esta sección permite ver la configuración de tipos de recibo. "
+        "Para modificaciones avanzadas (campos auxiliares, palabras clave), edita directamente config.yaml "
+        "y usa el botón 'Reconstruir Caché' para recargar los cambios."
+    )
+    
+    # Initialize config service
+    if 'config_service' not in st.session_state:
+        st.session_state.config_service = ConfigService()
+    
+    config_service = st.session_state.config_service
+    
+    # Control buttons
+    col1, col2, col3 = st.columns([2, 2, 2])
+    
+    with col1:
+        if st.button("🔄 Reconstruir Caché", help="Recargar configuración desde config.yaml"):
+            config_service.rebuild_cache()
+            # Also invalidate caches in OCR processor and receipt service
+            if 'ocr_processor' in st.session_state:
+                st.session_state.ocr_processor.invalidate_prompt_cache()
+            if 'receipt_service' in st.session_state:
+                st.session_state.receipt_service.invalidate_scoring_cache()
+            st.success("✅ Caché reconstruida y configuración recargada")
+            st.rerun()
+    
+    with col2:
+        if st.button("📖 Ver Librería de Campos"):
+            st.session_state.show_field_library = not st.session_state.get('show_field_library', False)
+    
+    with col3:
+        if st.button("📤 Exportar Config"):
+            with tempfile.NamedTemporaryFile(mode='w', suffix='.yaml', delete=False) as f:
+                success = config_service.export_to_yaml(f.name)
+                if success:
+                    with open(f.name, 'r', encoding='utf-8') as rf:
+                        yaml_data = rf.read()
+                    st.download_button(
+                        label="⬇️ Descargar YAML",
+                        data=yaml_data,
+                        file_name=f"receipt_types_{datetime.now().strftime('%Y%m%d_%H%M%S')}.yaml",
+                        mime="text/yaml"
+                    )
+    
+    # Field library
+    if st.session_state.get('show_field_library', False):
+        with st.expander("📚 Librería de Campos Disponibles", expanded=True):
+            field_library = config_service.get_field_library()
+            
+            if field_library:
+                st.markdown("**Campos reutilizables (definidos en config.yaml):**")
+                
+                library_data = []
+                for field_key, field_config in sorted(field_library.items()):
+                    library_data.append({
+                        'Campo': f"`{field_key}`",
+                        'Tipo': field_config.get('type', 'text'),
+                        'Pregunta': field_config.get('question', ''),
+                        'Ayuda': field_config.get('help', '')
+                    })
+                
+                st.dataframe(library_data, use_container_width=True, hide_index=True)
+            else:
+                st.info("No hay campos en la librería")
+    
+    st.divider()
+    
+    # Types list
+    st.subheader("📋 Tipos Configurados")
+    
+    type_definitions = config_service.get_type_definitions()
+    
+    # Summary stats
+    enabled_count = sum(1 for t in type_definitions if t.enabled)
+    disabled_count = len(type_definitions) - enabled_count
+    
+    col_stat1, col_stat2, col_stat3 = st.columns(3)
+    col_stat1.metric("Total de Tipos", len(type_definitions))
+    col_stat2.metric("Habilitados", enabled_count)
+    col_stat3.metric("Deshabilitados", disabled_count)
+    
+    # Types table - simplified view
+    for idx, type_def in enumerate(type_definitions):
+        status_icon = "✅" if type_def.enabled else "❌"
+        max_score = type_def.calculate_max_score()
+        
+        with st.expander(
+            f"{status_icon} **{type_def.name}** (Score máximo: {max_score})",
+            expanded=False
+        ):
+            col_info1, col_info2 = st.columns(2)
+            
+            with col_info1:
+                st.write(f"**Estado:** {'Habilitado' if type_def.enabled else 'Deshabilitado'}")
+                st.write(f"**Indicador Directo:**")
+                if type_def.direct_indicator:
+                    di = type_def.direct_indicator
+                    st.code(f"{di.get('field_key', 'N/A')}: {di.get('question', 'N/A')} (peso: {di.get('weight', 0)})")
+                else:
+                    st.caption("Sin indicador directo")
+            
+            with col_info2:
+                st.write(f"**Campos Auxiliares:** {len(type_def.auxiliary_fields)}")
+                if type_def.auxiliary_fields:
+                    for field_key, field_config in list(type_def.auxiliary_fields.items())[:3]:
+                        st.caption(f"• {field_key} (peso: {field_config.get('weight', 0)})")
+                    if len(type_def.auxiliary_fields) > 3:
+                        st.caption(f"... y {len(type_def.auxiliary_fields) - 3} más")
+                
+                st.write(f"**Palabras Clave:** {len(type_def.keyword_weights)}")
+                if type_def.keyword_weights:
+                    keywords_text = ", ".join(list(type_def.keyword_weights.keys())[:5])
+                    st.caption(keywords_text)
+                    if len(type_def.keyword_weights) > 5:
+                        st.caption(f"... y {len(type_def.keyword_weights) - 5} más")
+            
+            st.info("💡 Para modificar este tipo, edita config.yaml y usa 'Reconstruir Caché'")
+    
+    st.divider()
+    st.caption("🔧 **Gestión Avanzada:** Edita config.yaml para modificar campos, pesos y palabras clave. "
+               "Usa Export para guardar backups de tu configuración.")

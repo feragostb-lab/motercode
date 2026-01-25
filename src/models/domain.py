@@ -271,3 +271,88 @@ class PeriodStats:
     csv_upload_date: Optional[datetime] = None
     can_close: bool = False
     blocking_reasons: list = field(default_factory=list)
+
+
+@dataclass
+class FieldDefinition:
+    """Definition of a field for OCR extraction."""
+    key: str
+    required: str  # "yes" or "no"
+    question: str
+    field_type: str  # "text", "number", "date", "boolean"
+    help_text: str = ""
+    
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary."""
+        return {
+            'key': self.key,
+            'required': self.required,
+            'question': self.question,
+            'field_type': self.field_type,
+            'help_text': self.help_text
+        }
+
+
+@dataclass
+class ReceiptTypeDefinition:
+    """Configuration for a receipt type with detection rules."""
+    name: str
+    enabled: bool
+    direct_indicator: Dict[str, Any]  # {field_key, question, weight}
+    auxiliary_fields: Dict[str, Dict[str, Any]]  # {field_key: {question, weight, type, help}}
+    keyword_weights: Dict[str, int]  # {keyword: weight}
+    
+    def calculate_max_score(self) -> int:
+        """Calculate maximum possible score for this type."""
+        # Direct indicator weight
+        max_score = self.direct_indicator.get('weight', 0)
+        
+        # Sum of all auxiliary field weights
+        for field_config in self.auxiliary_fields.values():
+            max_score += field_config.get('weight', 0)
+        
+        # Sum of all keyword weights
+        for keyword_weight in self.keyword_weights.values():
+            max_score += keyword_weight
+        
+        return max_score
+    
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary."""
+        return {
+            'name': self.name,
+            'enabled': self.enabled,
+            'direct_indicator': self.direct_indicator,
+            'auxiliary_fields': self.auxiliary_fields,
+            'keyword_weights': self.keyword_weights,
+            'max_score': self.calculate_max_score()
+        }
+
+
+@dataclass
+class TypeScoreDetail:
+    """Detailed scoring information for a receipt type."""
+    type_name: str
+    total_score: int
+    max_score: int
+    primary_score: int
+    secondary_score: int
+    tertiary_score: int
+    matched_fields: list  # [{field: str, weight: int, tier: str}]
+    has_test_samples: bool = False
+    avg_confidence: float = 0.0
+    
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary."""
+        return {
+            'type_name': self.type_name,
+            'total_score': self.total_score,
+            'max_score': self.max_score,
+            'primary_score': self.primary_score,
+            'secondary_score': self.secondary_score,
+            'tertiary_score': self.tertiary_score,
+            'matched_fields': self.matched_fields,
+            'has_test_samples': self.has_test_samples,
+            'avg_confidence': self.avg_confidence,
+            'confidence_percentage': (self.total_score / self.max_score * 100) if self.max_score > 0 else 0
+        }

@@ -2,6 +2,7 @@
 
 from . import (
     processor_page,
+    failed_items_page,
     dashboard_receipts,
     dashboard_bank_transactions,
     dashboard_statistics,
@@ -17,9 +18,9 @@ from . import (
 
 __all__ = [
     'processor_page',
+    'failed_items_page',
     'dashboard_receipts',
     'dashboard_bank_transactions',
-    'dashboard_statistics',
     'dashboard_export',
     'rocskincare_workers',
     'rocskincare_periods',

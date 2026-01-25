@@ -45,6 +45,524 @@ queue:
   max_attempts: 3
   retry_backoff_base_minutes: 2
   warning_threshold: 300
+
+# Receipt Type Detection Configuration
+# This section defines how the system extracts data from receipts and classifies them by type
+receipt_type_definitions:
+  # Auto-backup configuration before saving changes through admin UI
+  auto_backup_on_save: true
+  backup_retention_days: 30
+  
+  # Common fields extracted from ALL receipt types
+  # Format: field_key: {required: "yes|no", question: "text", type: "text|number|date|boolean", help: "context"}
+  common_fields:
+    empresa:
+      required: "no"
+      question: "Nombre de la empresa"
+      type: "text"
+      help: "Razón social o nombre comercial del emisor"
+    nif:
+      required: "no"
+      question: "NIF/CIF de la empresa"
+      type: "text"
+      help: "Identificación fiscal del emisor"
+    total:
+      required: "yes"
+      question: "Importe total con moneda"
+      type: "number"
+      help: "Cantidad total a pagar incluyendo impuestos"
+    fecha:
+      required: "yes"
+      question: "Fecha del servicio"
+      type: "date"
+      help: "Fecha en que se realizó el servicio o compra"
+    hora:
+      required: "no"
+      question: "Hora del servicio"
+      type: "text"
+      help: "Hora en que se realizó el servicio"
+    descripcion:
+      required: "no"
+      question: "Descripción del servicio"
+      type: "text"
+      help: "Detalles adicionales del servicio prestado"
+    numero_factura:
+      required: "no"
+      question: "Número de factura (si está disponible)"
+      type: "text"
+      help: "Número identificador de la factura o recibo"
+  
+  # Field library - Reusable field definitions for quick insertion in type configuration
+  # Edit this section in config.yaml to add/modify available fields
+  field_library:
+    origen:
+      question: "Punto de origen"
+      type: "text"
+      help: "Ciudad o dirección de inicio del trayecto"
+    destino:
+      question: "Punto de destino"
+      type: "text"
+      help: "Ciudad o dirección de finalización del trayecto"
+    distancia:
+      question: "Kilómetros recorridos"
+      type: "number"
+      help: "Distancia total del trayecto"
+    licencia:
+      question: "Número de licencia/conductor"
+      type: "text"
+      help: "Identificación del conductor o licencia de taxi"
+    matricula:
+      question: "Matrícula del vehículo"
+      type: "text"
+      help: "Número de matrícula del vehículo"
+    nombre_hotel:
+      question: "Nombre del hotel"
+      type: "text"
+      help: "Denominación del establecimiento hotelero"
+    cliente:
+      question: "Nombre del cliente/huésped"
+      type: "text"
+      help: "Persona que se hospeda"
+    llegada:
+      question: "Fecha de llegada/check-in"
+      type: "date"
+      help: "Fecha de entrada al hotel"
+    salida:
+      question: "Fecha de salida/check-out"
+      type: "date"
+      help: "Fecha de salida del hotel"
+    habitacion:
+      question: "Número de habitación"
+      type: "text"
+      help: "Identificador de la habitación"
+    nombre_restaurante:
+      question: "Nombre del restaurante"
+      type: "text"
+      help: "Denominación del establecimiento"
+    camarero:
+      question: "Nombre del camarero"
+      type: "text"
+      help: "Persona que atendió"
+    cubiertos:
+      question: "Número de cubiertos"
+      type: "number"
+      help: "Cantidad de comensales servidos"
+    comensales:
+      question: "Número de comensales"
+      type: "number"
+      help: "Cantidad de personas"
+    mesa:
+      question: "Número de mesa"
+      type: "text"
+      help: "Identificador de la mesa"
+    litros_combustible:
+      question: "Litros de combustible"
+      type: "number"
+      help: "Cantidad de combustible repostado"
+    combustible:
+      question: "Tipo de combustible"
+      type: "text"
+      help: "Gasolina, diesel, etc."
+    compañia_aerea:
+      question: "Compañía aérea"
+      type: "text"
+      help: "Aerolínea que opera el vuelo"
+    aeropuerto:
+      question: "Aeropuerto"
+      type: "text"
+      help: "Aeropuerto de origen o destino"
+    empresa_ferroviaria:
+      question: "Empresa de tren"
+      type: "text"
+      help: "Compañía ferroviaria (Renfe, etc.)"
+    estacion:
+      question: "Estación de tren"
+      type: "text"
+      help: "Estación de origen o destino"
+    compañia_telefonia:
+      question: "Compañía de teléfono"
+      type: "text"
+      help: "Operador telefónico"
+    autopista:
+      question: "Nombre de la autopista"
+      type: "text"
+      help: "Identificación de la vía de peaje"
+    clase:
+      question: "Clase del vehículo"
+      type: "text"
+      help: "Categoría del vehículo para peaje"
+    ciudad_parking:
+      question: "Ciudad del parking"
+      type: "text"
+      help: "Ubicación del estacionamiento"
+    empresa_alquiler:
+      question: "Empresa de alquiler de coches"
+      type: "text"
+      help: "Compañía de rent-a-car"
+    empresa_mensajeria:
+      question: "Empresa de mensajería"
+      type: "text"
+      help: "Servicio de envío o courier"
+  
+  # Type definitions - Configure each receipt type with detection rules
+  # Each type has: name (max 30 chars), enabled status, direct indicator, auxiliary fields, keyword weights
+  type_definitions:
+    # --- CONFIGURED TYPES WITH DETECTION RULES ---
+    
+    - name: "Taxis"
+      enabled: true
+      direct_indicator:
+        field_key: "taxi"
+        question: "¿Es taxi, uber o similar?"
+        weight: 10
+      auxiliary_fields:
+        origen:
+          question: "Punto de origen"
+          weight: 1
+          type: "text"
+          help: "Ciudad o dirección de recogida"
+        destino:
+          question: "Punto de destino"
+          weight: 1
+          type: "text"
+          help: "Ciudad o dirección de bajada"
+        distancia:
+          question: "Kilómetros recorridos"
+          weight: 1
+          type: "number"
+          help: "Distancia total del trayecto"
+        licencia:
+          question: "Número de licencia/conductor"
+          weight: 1
+          type: "text"
+          help: "Identificación del taxista"
+        matricula:
+          question: "Matrícula del vehículo"
+          weight: 1
+          type: "text"
+          help: "Número de placa del taxi"
+      keyword_weights:
+        taxi: 5
+        uber: 5
+        cabify: 5
+    
+    - name: "Hoteles"
+      enabled: true
+      direct_indicator:
+        field_key: "hotel"
+        question: "¿Es hotel o alojamiento?"
+        weight: 10
+      auxiliary_fields:
+        nombre_hotel:
+          question: "Nombre del hotel"
+          weight: 1
+          type: "text"
+          help: "Denominación del establecimiento"
+        cliente:
+          question: "Nombre del cliente/huésped"
+          weight: 1
+          type: "text"
+          help: "Persona hospedada"
+        llegada:
+          question: "Fecha de llegada/check-in"
+          weight: 1
+          type: "date"
+          help: "Fecha de entrada"
+        salida:
+          question: "Fecha de salida/check-out"
+          weight: 1
+          type: "date"
+          help: "Fecha de salida"
+        habitacion:
+          question: "Número de habitación"
+          weight: 1
+          type: "text"
+          help: "Número de cuarto"
+      keyword_weights:
+        hotel: 5
+        hospedaje: 3
+        alojamiento: 3
+    
+    - name: "Comidas"
+      enabled: true
+      direct_indicator:
+        field_key: "restaurante"
+        question: "¿Es restaurante o comida?"
+        weight: 10
+      auxiliary_fields:
+        nombre_restaurante:
+          question: "Nombre del restaurante"
+          weight: 1
+          type: "text"
+          help: "Denominación del local"
+        camarero:
+          question: "Nombre del camarero"
+          weight: 1
+          type: "text"
+          help: "Persona que atendió"
+        cubiertos:
+          question: "Número de cubiertos"
+          weight: 1
+          type: "number"
+          help: "Cantidad servida"
+        comensales:
+          question: "Número de comensales"
+          weight: 1
+          type: "number"
+          help: "Cantidad de personas"
+        mesa:
+          question: "Número de mesa"
+          weight: 1
+          type: "text"
+          help: "Identificador de mesa"
+      keyword_weights:
+        restaurante: 5
+        bar: 3
+        cafeteria: 3
+        restaurant: 5
+    
+    - name: "Vuelos"
+      enabled: true
+      direct_indicator:
+        field_key: "vuelo"
+        question: "¿Es vuelo aéreo?"
+        weight: 10
+      auxiliary_fields:
+        compañia_aerea:
+          question: "Compañía aérea"
+          weight: 1
+          type: "text"
+          help: "Aerolínea operadora"
+        aeropuerto:
+          question: "Aeropuerto"
+          weight: 1
+          type: "text"
+          help: "Aeropuerto de origen/destino"
+      keyword_weights:
+        vuelo: 5
+        flight: 5
+        aeropuerto: 3
+        boarding: 3
+    
+    - name: "Tren"
+      enabled: true
+      direct_indicator:
+        field_key: "tren"
+        question: "¿Es billete de tren?"
+        weight: 10
+      auxiliary_fields:
+        empresa_ferroviaria:
+          question: "Empresa de tren"
+          weight: 1
+          type: "text"
+          help: "Compañía ferroviaria"
+        estacion:
+          question: "Estación"
+          weight: 1
+          type: "text"
+          help: "Estación origen/destino"
+      keyword_weights:
+        tren: 5
+        train: 5
+        renfe: 5
+    
+    - name: "Peaje"
+      enabled: true
+      direct_indicator:
+        field_key: "peaje"
+        question: "¿Es peaje de autopista?"
+        weight: 10
+      auxiliary_fields:
+        autopista:
+          question: "Nombre de la autopista"
+          weight: 1
+          type: "text"
+          help: "Identificación de la vía"
+        clase:
+          question: "Clase del vehículo"
+          weight: 1
+          type: "text"
+          help: "Categoría para tarifa"
+      keyword_weights:
+        peaje: 5
+        autopista: 5
+    
+    - name: "Estacionamiento"
+      enabled: true
+      direct_indicator:
+        field_key: "parking"
+        question: "¿Es parking o estacionamiento?"
+        weight: 10
+      auxiliary_fields:
+        ciudad_parking:
+          question: "Ciudad del parking"
+          weight: 1
+          type: "text"
+          help: "Ubicación"
+        matricula:
+          question: "Matrícula del vehículo"
+          weight: 1
+          type: "text"
+          help: "Placa del coche"
+      keyword_weights:
+        parking: 5
+        aparcamiento: 5
+        estacionamiento: 5
+    
+    - name: "Coche"
+      enabled: true
+      direct_indicator:
+        field_key: "alquiler_coche"
+        question: "¿Es alquiler de coche?"
+        weight: 10
+      auxiliary_fields:
+        empresa_alquiler:
+          question: "Empresa de alquiler"
+          weight: 1
+          type: "text"
+          help: "Compañía de rent-a-car"
+        matricula:
+          question: "Matrícula del vehículo"
+          weight: 1
+          type: "text"
+          help: "Placa del coche alquilado"
+      keyword_weights:
+        alquiler: 5
+        rental: 5
+        rent: 3
+    
+    # --- EMPTY TYPES AWAITING USER CONFIGURATION ---
+    
+    - name: "Productos competitivos"
+      enabled: true
+      direct_indicator:
+        field_key: "producto_competitivo"
+        question: "¿Es compra de producto competitivo?"
+        weight: 10
+      auxiliary_fields: {}
+      keyword_weights: {}
+    
+    - name: "Compra de Productos RoC"
+      enabled: true
+      direct_indicator:
+        field_key: "producto_roc"
+        question: "¿Es compra de producto RoC?"
+        weight: 10
+      auxiliary_fields: {}
+      keyword_weights: {}
+    
+    - name: "Teléfono/Celular/Internet"
+      enabled: true
+      direct_indicator:
+        field_key: "telefono"
+        question: "¿Es factura de teléfono/internet?"
+        weight: 10
+      auxiliary_fields:
+        compañia_telefonia:
+          question: "Compañía de teléfono"
+          weight: 1
+          type: "text"
+          help: "Operador telefónico"
+      keyword_weights:
+        telefono: 5
+        telefonia: 5
+        movil: 3
+    
+    - name: "Entretenimiento"
+      enabled: true
+      direct_indicator:
+        field_key: "entretenimiento"
+        question: "¿Es gasto de entretenimiento?"
+        weight: 10
+      auxiliary_fields: {}
+      keyword_weights: {}
+    
+    - name: "Kilometraje"
+      enabled: true
+      direct_indicator:
+        field_key: "kilometraje"
+        question: "¿Es reembolso por kilometraje?"
+        weight: 10
+      auxiliary_fields:
+        distancia:
+          question: "Kilómetros recorridos"
+          weight: 1
+          type: "number"
+          help: "Distancia total"
+      keyword_weights: {}
+    
+    - name: "Conferencias y Eventos"
+      enabled: true
+      direct_indicator:
+        field_key: "conferencia"
+        question: "¿Es gasto de conferencia o evento?"
+        weight: 10
+      auxiliary_fields: {}
+      keyword_weights: {}
+    
+    - name: "Membresías y Publicaciones"
+      enabled: true
+      direct_indicator:
+        field_key: "membresia"
+        question: "¿Es membresía o publicación?"
+        weight: 10
+      auxiliary_fields: {}
+      keyword_weights: {}
+    
+    - name: "Suscripciones"
+      enabled: true
+      direct_indicator:
+        field_key: "suscripcion"
+        question: "¿Es suscripción a servicio?"
+        weight: 10
+      auxiliary_fields: {}
+      keyword_weights: {}
+    
+    - name: "Materiales de Oficina"
+      enabled: true
+      direct_indicator:
+        field_key: "material_oficina"
+        question: "¿Es material de oficina?"
+        weight: 10
+      auxiliary_fields: {}
+      keyword_weights: {}
+    
+    - name: "Envío Postal"
+      enabled: true
+      direct_indicator:
+        field_key: "mensajeria"
+        question: "¿Es envío postal o mensajería?"
+        weight: 10
+      auxiliary_fields:
+        empresa_mensajeria:
+          question: "Empresa de mensajería"
+          weight: 1
+          type: "text"
+          help: "Servicio de envío"
+      keyword_weights:
+        mensajeria: 5
+        envio: 5
+        courier: 5
+    
+    - name: "Informática"
+      enabled: true
+      direct_indicator:
+        field_key: "informatica"
+        question: "¿Es gasto de informática/hardware?"
+        weight: 10
+      auxiliary_fields: {}
+      keyword_weights: {}
+    
+    - name: "Software"
+      enabled: true
+      direct_indicator:
+        field_key: "software"
+        question: "¿Es licencia o servicio de software?"
+        weight: 10
+      auxiliary_fields: {}
+      keyword_weights: {}
+
+# Legacy receipt_types kept for backward compatibility - will be deprecated
 receipt_types:
 - Productos competitivos
 - Compra de Productos RoC

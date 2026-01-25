@@ -178,13 +178,23 @@ class Config:
     
     @property
     def receipt_types(self) -> list:
-        """Get receipt types."""
+        """Get receipt types (legacy - for backward compatibility)."""
         return self._config.get('receipt_types', [])
+    
+    @property
+    def receipt_type_definitions(self) -> Dict[str, Any]:
+        """Get receipt type definitions configuration."""
+        return self._config.get('receipt_type_definitions', {})
     
     @property
     def matching(self) -> Dict[str, Any]:
         """Get matching configuration."""
         return self._config.get('matching', {})
+    
+    def reload(self):
+        """Reload configuration from file."""
+        self.load()
+        logger.info("Configuration reloaded")
 
 
 # Global configuration instance

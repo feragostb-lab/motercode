@@ -4,7 +4,7 @@ import threading
 import time
 import json
 from pathlib import Path
-from typing import Optional, Callable
+from typing import Optional, Callable, Dict, Any
 from datetime import datetime
 from decimal import Decimal
 
@@ -17,6 +17,7 @@ from src.core.backup_manager import BackupManager
 from src.core.resource_manager import ResourceMonitor
 from src.services.queue_service import QueueService
 from src.services.receipt_service import ReceiptService
+from src.services.config_service import ConfigService
 from src.utils.file_helpers import resize_image_if_needed, image_to_base64, cleanup_temp_files
 from src.utils.formatters import normalizar_fecha, normalizar_monto, generar_nombre_archivo
 from src.models.domain import Receipt, ProcessingStatus
@@ -40,6 +41,7 @@ class BackgroundOCRProcessor:
         # Services
         self.queue_service = QueueService(self.config)
         self.receipt_service = ReceiptService(self.config)
+        self.config_service = ConfigService(config_path)
         
         # Components
         self.backup_manager = BackupManager(
@@ -63,6 +65,9 @@ class BackgroundOCRProcessor:
         self._force_stop = False  # Flag to force stop current processing
         self._worker_thread: Optional[threading.Thread] = None
         self._llm: Optional[Llama] = None
+        
+        # Cached prompt (invalidated on config reload)
+        self._cached_prompt: Optional[str] = None
         
         # Stats
         self.stats = {
@@ -507,57 +512,67 @@ class BackgroundOCRProcessor:
                     logger.warning(f"Failed to cleanup temp file: {cleanup_error}")
     
     def _get_extraction_prompt(self) -> str:
-        """Get the extraction prompt for VLM."""
-        return """Extrae los datos del recibo. Completa solo los campos que encuentres:
-
-{
-  "empresa": "Nombre de la empresa",
-  "nif": "NIF/CIF de la empresa",
-  "total": "Importe total con moneda , o import taxim (si es taxi , uber o similar)",
-  "fecha": "Fecha del servicio",
-  "hora": "Hora del servicio",
-  "clase": "Clase del vehículo (si es una autopista)",
-  "autopista": "Nombre de la autopista (si es una autopista)",  
-  "descripcion": "Descripción del servicio",
-  "origen": "Punto de origen (si es taxi , uber o similar)",
-  "destino": "Punto de destino (si es taxi , uber o similar)",
-  "distancia": "Kilómetros (si es taxi , uber o similar)",
-  "licencia": "Número de licencia/conductor (si es taxi , uber o similar)",
-  "matricula": "Matrícula vehículo (si es taxi , uber o similar)",
-  "ciudad_parking": "Ciudad (si es parking)",
-  "nombre_hotel": "Nombre hotel (si es hotel)",
-  "cliente": "Nombre cliente (si es hotel)",
-  "llegada": "Fecha llegada (si es hotel)",
-  "salida": "Fecha salida (si es hotel)",
-  "nombre_restaurante": "Nombre restaurante (si es comida)",
-  "camarero": "Nombre camarero (si es comida)",
-  "cubiertos": "Número cubiertos (si es comida)",
-  "comensales": "Número comensales (si es comida)",
-  "clase": "clase del vehículo (si es peaje)",
-  "mesa": "Número mesa (si es comida)",
-  "litros_combustible": "Litros combustible (si es gasolina)",
-  "empresa_alquiler": "Empresa alquiler (si es coche alquiler)",
-  "compañia_aerea": "Compañía aérea (si es vuelo)",
-  "empresa_ferroviaria": "Empresa tren (si es tren)",
-  "compañia_telefonia": "Compañía teléfono (si es teléfono)",
-  "estacion_peaje": "Estación peaje (si es peaje)",
-  "empresa_mensajeria": "Empresa mensajería (si es envío)",
-  "numero_factura": "Número de factura (si está disponible)"
-  "restaurante": "Indica si el recibo es de restaurante/comida",
-  "parking": "Indica si el recibo es de parking",
-  "gasolina": "Indica si el recibo es de repostaje de gasolina o gasóleo",
-  "taxi": "Indica si el recibo es de taxi, uber o similar",
-  "hotel": "Indica si el recibo es de hotel",
-  "peaje": "Indica si el recibo es de peaje de autopista",
-  "vuelo": "Indica si el recibo es de vuelo aéreo",
-  "tren": "Indica si el recibo es de billete de tren",
-  "telefono": "Indica si el recibo es de factura de teléfono",
-  "alquiler_coche": "Indica si el recibo es de alquiler de coche",
-  "mensajeria": "Indica si el recibo es de mensajería o envío"
-}
-
-
-Responde SOLO en formato JSON. Omite campos vacíos."""
+        """
+        Get the extraction prompt for VLM with dynamic field generation from config.
+        Uses cached prompt for performance - invalidated on config reload.
+        
+        Returns:
+            Formatted JSON prompt string
+        """
+        # Return cached prompt if available
+        if self._cached_prompt is not None:
+            return self._cached_prompt
+        
+        logger.info("Building extraction prompt from configuration...")
+        
+        # Get configuration
+        common_fields = self.config_service.get_common_fields()
+        enabled_types = self.config_service.get_enabled_type_definitions()
+        
+        # Build field dictionary for JSON prompt
+        fields = {}
+        
+        # Add common fields first
+        for field_key, field_config in common_fields.items():
+            fields[field_key] = field_config.get('question', field_key)
+        
+        # Add auxiliary fields from all enabled types
+        for type_def in enabled_types:
+            for field_key, field_config in type_def.auxiliary_fields.items():
+                # Avoid duplicates - first definition wins
+                if field_key not in fields:
+                    fields[field_key] = field_config.get('question', field_key)
+        
+        # Add direct indicator fields last (boolean type indicators)
+        for type_def in enabled_types:
+            if type_def.direct_indicator:
+                field_key = type_def.direct_indicator.get('field_key')
+                question = type_def.direct_indicator.get('question')
+                if field_key and question and field_key not in fields:
+                    fields[field_key] = question
+        
+        # Build JSON prompt structure
+        prompt = "Extrae los datos del recibo. Completa solo los campos que encuentres:\n\n{\n"
+        
+        field_items = []
+        for field_key, question in fields.items():
+            field_items.append(f'  "{field_key}": "{question}"')
+        
+        prompt += ",\n".join(field_items)
+        prompt += "\n}\n\n"
+        prompt += "Responde SOLO en formato JSON. Omite campos vacíos."
+        
+        # Cache the prompt
+        self._cached_prompt = prompt
+        
+        logger.info(f"Extraction prompt built with {len(fields)} fields from {len(enabled_types)} enabled types")
+        
+        return prompt
+    
+    def invalidate_prompt_cache(self):
+        """Invalidate cached extraction prompt (call after config reload)."""
+        self._cached_prompt = None
+        logger.info("Extraction prompt cache invalidated")
     
     def _parse_json_response(self, response_text: str) -> Optional[dict]:
         """Parse JSON from model response, handling markdown code blocks."""

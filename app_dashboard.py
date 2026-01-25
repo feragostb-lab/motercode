@@ -32,7 +32,10 @@ def init_session_state():
         st.session_state.matching_service = BankMatchingService(config)
         st.session_state.stats_service = StatisticsService(config)
         st.session_state.export_service = ExportService(config)
-        
+    
+    # Initialize ignored_repo separately to handle system resets
+    if 'ignored_repo' not in st.session_state:
+        config = st.session_state.config
         db = get_database(config.paths.get('database'))
         st.session_state.ignored_repo = IgnoredRepository(db)
     

@@ -21,6 +21,7 @@ from src.core.logging import setup_logging
 # Import pages from the modular structure
 from modules import (
     processor_page,
+    failed_items_page,
     dashboard_receipts,
     dashboard_bank_transactions,
     dashboard_statistics,
@@ -51,6 +52,23 @@ def init_session_state():
     if 'database' not in st.session_state:
         config = st.session_state.config
         st.session_state.database = get_database(config.paths.get('database'))
+    
+    # Initialize dashboard services (needed for statistics, export, etc.)
+    if 'receipt_service' not in st.session_state:
+        from src.services.receipt_service import ReceiptService
+        from src.services.bank_matching_service import BankMatchingService
+        from src.services.statistics_service import StatisticsService
+        from src.services.export_service import ExportService
+        from src.repositories.ignored_repository import IgnoredRepository
+        
+        config = st.session_state.config
+        db = st.session_state.database
+        
+        st.session_state.receipt_service = ReceiptService(config)
+        st.session_state.matching_service = BankMatchingService(config)
+        st.session_state.stats_service = StatisticsService(config)
+        st.session_state.export_service = ExportService(config)
+        st.session_state.ignored_repo = IgnoredRepository(db)
     
     # Main navigation state
     if 'main_module' not in st.session_state:
@@ -99,7 +117,17 @@ def main():
         st.markdown("---")
         
         # Sub-navigation based on module
-        if st.session_state.main_module == "Dashboard":
+        if st.session_state.main_module == "OCR Processor":
+            st.subheader("OCR Processor")
+            sub_page = st.radio(
+                "Páginas:",
+                ["🖼️ Procesador", "❌ Items Fallidos"],
+                key='processor_sub_nav',
+                label_visibility="collapsed"
+            )
+            st.session_state.sub_page = sub_page
+        
+        elif st.session_state.main_module == "Dashboard":
             st.subheader("Dashboard")
             sub_page = st.radio(
                 "Páginas:",
@@ -127,7 +155,10 @@ def main():
     
     # Render selected page
     if st.session_state.main_module == "OCR Processor":
-        processor_page.render()
+        if st.session_state.sub_page == "❌ Items Fallidos":
+            failed_items_page.render()
+        else:
+            processor_page.render()
     
     elif st.session_state.main_module == "Dashboard":
         if st.session_state.sub_page == "📄 Recibos":
