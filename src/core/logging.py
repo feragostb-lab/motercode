@@ -20,15 +20,25 @@ class TeeStream:
     def write(self, data):
         if not data:
             return
+        # Try writing to file (silent fail if closed)
         try:
             self._ensure_file_open()
-            self._file.write(data)
-            self._file.flush()
+            if self._file and not getattr(self._file, 'closed', True):
+                self._file.write(data)
+                self._file.flush()
+        except (ValueError, OSError):
+            # File closed or I/O error, silently skip
+            pass
         except Exception:
             pass
+        # Always try to write to original stream
         try:
-            self.original_stream.write(data)
-            self.original_stream.flush()
+            if self.original_stream and not getattr(self.original_stream, 'closed', False):
+                self.original_stream.write(data)
+                self.original_stream.flush()
+        except (ValueError, OSError):
+            # Stream closed, silently skip
+            pass
         except Exception:
             pass
 
@@ -101,10 +111,23 @@ def setup_logging(config, app_name: str = 'app', capture_std: bool = True):
 
     # Optional stdout/stderr capture (for non-logging prints or native libs)
     if capture_std:
-        if not isinstance(sys.stdout, TeeStream):
-            sys.stdout = TeeStream(str(log_file), sys.__stdout__)
-        if not isinstance(sys.stderr, TeeStream):
-            sys.stderr = TeeStream(str(log_file), sys.__stderr__)
+        # Close and replace existing TeeStreams to avoid "closed file" errors on Streamlit reruns
+        if isinstance(sys.stdout, TeeStream):
+            try:
+                sys.stdout.close()
+            except:
+                pass
+            sys.stdout = sys.__stdout__
+        if isinstance(sys.stderr, TeeStream):
+            try:
+                sys.stderr.close()
+            except:
+                pass
+            sys.stderr = sys.__stderr__
+        
+        # Create new TeeStreams
+        sys.stdout = TeeStream(str(log_file), sys.__stdout__)
+        sys.stderr = TeeStream(str(log_file), sys.__stderr__)
 
     # Log initialized
     logging.getLogger(__name__).info(f"Logging initialized for '{app_name}' -> {log_file}")

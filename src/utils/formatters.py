@@ -52,6 +52,14 @@ def normalizar_fecha(fecha_str) -> Optional[datetime]:
 def normalizar_monto(importe_str) -> Optional[Decimal]:
     """
     Convert various amount formats to Decimal.
+    Handles both comma and dot as decimal separators.
+    
+    Examples:
+        "9.60" -> Decimal("9.60")
+        "9,60" -> Decimal("9.60")
+        "1.234,56" -> Decimal("1234.56")
+        "1,234.56" -> Decimal("1234.56")
+        "€9.60" -> Decimal("9.60")
     
     Args:
         importe_str: Amount string (with or without currency symbols)
@@ -67,8 +75,34 @@ def normalizar_monto(importe_str) -> Optional[Decimal]:
         if isinstance(importe_str, (int, float)):
             return Decimal(str(abs(float(importe_str))))
         
-        # Clean string: remove currency symbols, replace comma with dot
-        importe_clean = str(importe_str).replace('€', '').replace(',', '.').strip()
+        # Convert to string and clean
+        importe_str = str(importe_str).strip()
+        
+        # Remove currency symbols and spaces
+        importe_clean = importe_str.replace('€', '').replace('$', '').replace(' ', '').strip()
+        
+        # Detect format: determine if comma or dot is the decimal separator
+        # If both present, the last one is the decimal separator
+        has_comma = ',' in importe_clean
+        has_dot = '.' in importe_clean
+        
+        if has_comma and has_dot:
+            # Both present: determine which is decimal separator
+            last_comma = importe_clean.rfind(',')
+            last_dot = importe_clean.rfind('.')
+            
+            if last_comma > last_dot:
+                # Format: 1.234,56 (European)
+                importe_clean = importe_clean.replace('.', '').replace(',', '.')
+            else:
+                # Format: 1,234.56 (American)
+                importe_clean = importe_clean.replace(',', '')
+        elif has_comma:
+            # Only comma: assume it's decimal separator (European format)
+            importe_clean = importe_clean.replace(',', '.')
+        # If only dot or neither, use as-is
+        
+        # Remove any remaining non-numeric characters except dot
         importe_clean = re.sub(r'[^\d\.]', '', importe_clean)
         
         if importe_clean:

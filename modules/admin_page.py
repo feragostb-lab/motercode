@@ -660,9 +660,7 @@ def render_receipt_types_config():
     with col1:
         if st.button("🔄 Reconstruir Caché", help="Recargar configuración desde config.yaml"):
             config_service.rebuild_cache()
-            # Also invalidate caches in OCR processor and receipt service
-            if 'ocr_processor' in st.session_state:
-                st.session_state.ocr_processor.invalidate_prompt_cache()
+            # Invalidate caches in receipt service (OCR processor no longer uses cache)
             if 'receipt_service' in st.session_state:
                 st.session_state.receipt_service.invalidate_scoring_cache()
             st.success("✅ Caché reconstruida y configuración recargada")

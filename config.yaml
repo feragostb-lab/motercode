@@ -25,22 +25,26 @@ paths:
   output_dir: ./result
   temp_dir: ./temp
 processor:
-  batch_size: 4096
-  context_size: 32768
+  batch_size: 512
+  context_size: 8192
   gpu_layers: 0
   idle_boost_enabled: true
   idle_cpu_percent: 95
   idle_ram_percent: 95
   idle_threshold_minutes: 5
   max_cpu_percent: 70
-  max_image_size_kb: 150
+  max_image_size_kb: 600
   max_ram_percent: 70
   max_tokens: 512
-  mmproj_path: ./models/mmproj-Qwen2.5-VL-7B-Instruct-f16.gguf
+  mmproj_path: ./models/mmproj-Qwen2.5-VL-7B-Instruct-Q8_0.gguf
   model_path: ./models/Qwen_Qwen2.5-VL-7B-Instruct-Q4_K_M.gguf
   resource_check_interval_seconds: 5
   temperature: 0.1
-  threads: 8
+  threads: 6
+  # Image preprocessing configuration
+  image_preprocessing:
+    enable_grayscale: true
+    resize_factor: 672  # Resize longest side to this value (must be multiple of 28). Set to 0 to disable.
 queue:
   max_attempts: 3
   retry_backoff_base_minutes: 2
