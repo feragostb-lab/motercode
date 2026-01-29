@@ -10,7 +10,7 @@ from datetime import datetime
 from decimal import Decimal
 
 from llama_cpp import Llama
-from llama_cpp.llama_chat_format import Llava15ChatHandler
+from llama_cpp.llama_chat_format import Qwen25VLChatHandler
 
 from src.core.config import get_config
 from src.core.database import get_database
@@ -157,10 +157,10 @@ class BackgroundOCRProcessor:
             n_gpu_layers = processor_config.get('gpu_layers', 0)
             n_ctx = processor_config.get('context_size', 32768)
             
-            # Initialize chat handler
-            chat_handler = Llava15ChatHandler(clip_model_path=mmproj_path)
+            # Initialize chat handler for Qwen2.5-VL
+            chat_handler = Qwen25VLChatHandler(clip_model_path=mmproj_path)
             
-            # Load model
+            # Load model (tokenizer is embedded in GGUF)
             self._llm = Llama(
                 model_path=model_path,
                 chat_handler=chat_handler,
@@ -655,9 +655,58 @@ class BackgroundOCRProcessor:
 
         logger.info(f"🧪 Ejecutando OCR de prueba en: {img_path.name}")
         self._initialize_model()
+        
+        temp_file = None
 
         try:
-            data_uri = f"data:image/jpeg;base64,{image_to_base64(img_path)}"
+            # Get image preprocessing config
+            img_config = self.config.processor.get('image_preprocessing', {})
+            enable_grayscale = img_config.get('enable_grayscale', False)
+            resize_factor = img_config.get('resize_factor', 0)
+            
+            file_to_process = img_path
+            
+            # Step 1: Apply resize and/or grayscale if configured
+            if resize_factor > 0 or enable_grayscale:
+                logger.debug(f"  ➜ Applying image preprocessing (grayscale={enable_grayscale}, resize_factor={resize_factor})...")
+                from src.utils.file_helpers import resize_to_factor
+                
+                processed_path, was_processed = resize_to_factor(
+                    str(img_path),
+                    resize_factor=resize_factor,
+                    to_grayscale=enable_grayscale,
+                    temp_dir=self.config.paths.get('temp_dir', './temp')
+                )
+                
+                if was_processed:
+                    temp_file = processed_path  # Mark for cleanup
+                    file_to_process = Path(processed_path)
+                    logger.debug(f"  ➜ Image preprocessed: {temp_file}")
+                else:
+                    logger.debug(f"  ➜ No preprocessing applied")
+            else:
+                logger.debug(f"  ➜ Image preprocessing disabled, using original image")
+            
+            # Step 2: Resize if still too large (KB size limit)
+            max_kb = self.config.processor.get('max_image_size_kb', 600)
+            logger.debug(f"  ➜ Checking size limit (max: {max_kb}KB)...")
+            from src.utils.file_helpers import resize_image_if_needed
+            resized_path, is_temp = resize_image_if_needed(file_to_process, max_kb)
+            
+            if is_temp:
+                if temp_file and temp_file != file_to_process:
+                    # Clean up previous temp and use new one
+                    try:
+                        Path(temp_file).unlink(missing_ok=True)
+                    except:
+                        pass
+                temp_file = resized_path
+                file_to_process = Path(resized_path)
+                logger.debug(f"  ➜ Image resized to meet size limit: {temp_file}")
+            
+            logger.debug(f"  ➜ Final image for processing: {file_to_process}")
+            
+            data_uri = f"data:image/jpeg;base64,{image_to_base64(file_to_process)}"
             model_response = self._extract_with_simple_response(data_uri, stage=1)
 
             if not model_response:
@@ -692,6 +741,14 @@ class BackgroundOCRProcessor:
             }
 
         finally:
+            # Cleanup temp file
+            if temp_file:
+                logger.debug(f"  ➜ Cleaning up temp file: {temp_file}")
+                try:
+                    Path(temp_file).unlink(missing_ok=True)
+                except Exception as cleanup_error:
+                    logger.warning(f"Failed to cleanup temp file: {cleanup_error}")
+            
             if self._llm:
                 try:
                     self._llm.reset()
@@ -730,7 +787,7 @@ class BackgroundOCRProcessor:
             
             response = self._llm.create_chat_completion(
                 messages=[
-                    {"role": "system", "content": "Eres un experto en extracción de datos de recibos."},
+                    {"role": "system", "content": "Eres un experto en extracción de datos de recibos. Tu salida debe ser exclusivamente JSON válido sin texto adicional."},
                     {
                         "role": "user",
                         "content": [
@@ -1119,29 +1176,15 @@ class BackgroundOCRProcessor:
         categories = [type_def.name for type_def in enabled_types]
         categories_str = ", ".join(categories)
         
-        prompt = f"""Analiza el recibo.
-1. Extrae los datos básicos.
-2. Clasifica el recibo en las categorías que correspondan de la lista.
-
-LISTA DE CATEGORÍAS: [{categories_str}]
-
-Responde SOLO con este formato JSON:
-{{
-  "basicos": {{
-    "empresa": "string",
-    "nif": "string",
-    "total": "number",
-    "moneda": "string",
-    "fecha": "DD/MM/YYYY",
-    "hora": "HH:MM",
-    "desc": "string",
-    "factura": "string"
-  }},
-  "categorias": "string (lista concatenada separada por comas, o null si no aplica)"
-}}
-
-Si el recibo encaja en múltiples categorías, sepáralas con comas. Ej: "Comidas, Entretenimiento"
-Si no encaja en ninguna categoría, usa null en "categorias"."""
+        prompt = (
+            "Analiza el recibo y clasifícalo según esta lista: "
+            f"[{categories_str}].\n\n"
+            "Regla: Solo incluye categorías con un nivel de confianza superior al 9%.\n\n"
+            "Devuelve exclusivamente este formato JSON (sin texto adicional):\n"
+            "{\n"
+            '    "categorias": "lista de categorías separadas por comas"\n'
+            "}"
+        )
         
         return prompt
     

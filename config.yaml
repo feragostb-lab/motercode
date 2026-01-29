@@ -38,6 +38,7 @@ processor:
   max_tokens: 512
   mmproj_path: ./models/mmproj-Qwen2.5-VL-7B-Instruct-Q8_0.gguf
   model_path: ./models/Qwen_Qwen2.5-VL-7B-Instruct-Q4_K_M.gguf
+  tokenizer_path: ./models/tokenizer.json
   resource_check_interval_seconds: 5
   temperature: 0.1
   threads: 6
