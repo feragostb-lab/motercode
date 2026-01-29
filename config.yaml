@@ -291,7 +291,7 @@ receipt_type_definitions:
       enabled: true
       direct_indicator:
         field_key: "restaurante"
-        question: "¿Es restaurante o comida?"
+        question: "¿Es restaurante , comida , cena , desayuno , cafeteria o bar?"
         weight: 10
       auxiliary_fields:
         nombre_restaurante:

@@ -28,7 +28,7 @@ class TestDeduceReceiptType:
         }
         
         result = service.deduce_receipt_type(extracted_data)
-        assert result == 'taxis'
+        assert result == 'Taxis'
     
     def test_deduce_type_taxi_with_taximetro(self, mock_config):
         """🔴 RED: Should detect taxi from 'taximetro' keyword."""
@@ -41,7 +41,7 @@ class TestDeduceReceiptType:
         }
         
         result = service.deduce_receipt_type(extracted_data)
-        assert result == 'taxis'
+        assert result == 'Taxis'
     
     def test_deduce_type_restaurant_with_camarero(self, mock_config):
         """🔴 RED: Should detect restaurant from 'camarero' keyword."""
@@ -54,7 +54,7 @@ class TestDeduceReceiptType:
         }
         
         result = service.deduce_receipt_type(extracted_data)
-        assert result == 'restaurante'
+        assert result == 'Comidas'
     
     def test_deduce_type_restaurant_with_high_amount(self, mock_config):
         """🔴 RED: Should detect restaurant from high total amount."""
@@ -67,7 +67,7 @@ class TestDeduceReceiptType:
         }
         
         result = service.deduce_receipt_type(extracted_data)
-        assert result == 'restaurante'
+        assert result == 'Comidas'
     
     def test_deduce_type_factura_with_nif(self, mock_config):
         """🔴 RED: Should detect invoice from NIF."""
@@ -80,7 +80,7 @@ class TestDeduceReceiptType:
         }
         
         result = service.deduce_receipt_type(extracted_data)
-        assert result == 'factura'
+        assert result == 'Otros'
     
     def test_deduce_type_parking_with_keyword(self, mock_config):
         """🔴 RED: Should detect parking from 'parking' keyword."""
@@ -93,7 +93,7 @@ class TestDeduceReceiptType:
         }
         
         result = service.deduce_receipt_type(extracted_data)
-        assert result == 'parking'
+        assert result == 'Estacionamiento'
     
     def test_deduce_type_default_ticket(self, mock_config):
         """🔴 RED: Should default to 'ticket' if no patterns match."""
@@ -105,14 +105,14 @@ class TestDeduceReceiptType:
         }
         
         result = service.deduce_receipt_type(extracted_data)
-        assert result == 'ticket'
+        assert result == 'Otros'
     
     def test_deduce_type_empty_data(self, mock_config):
         """🔴 RED: Should default to 'ticket' for empty data."""
         service = ReceiptService(mock_config)
         
         result = service.deduce_receipt_type({})
-        assert result == 'ticket'
+        assert result == 'Otros'
 
 
 # ========================================

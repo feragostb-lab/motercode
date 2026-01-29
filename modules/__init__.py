@@ -13,7 +13,8 @@ from . import (
     rocskincare_csv_upload,
     rocskincare_period_closure,
     rocskincare_visualization,
-    admin_page
+    admin_page,
+    admin_test_receipt
 )
 
 __all__ = [
@@ -28,5 +29,6 @@ __all__ = [
     'rocskincare_csv_upload',
     'rocskincare_period_closure',
     'rocskincare_visualization',
-    'admin_page'
+    'admin_page',
+    'admin_test_receipt'
 ]

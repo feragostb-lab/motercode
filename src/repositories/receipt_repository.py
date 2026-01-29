@@ -26,6 +26,17 @@ class ReceiptRepository(BaseRepository[Receipt]):
         if not description and extracted_data:
             description = extracted_data.get('empresa', '') or ''
         
+        # Handle worker_id and period_id with fallback for old databases
+        try:
+            worker_id = row['worker_id']
+        except (KeyError, IndexError):
+            worker_id = None
+        
+        try:
+            period_id = row['period_id']
+        except (KeyError, IndexError):
+            period_id = None
+        
         return Receipt(
             id=row['id'],
             file_path=row['file_path'],
@@ -39,6 +50,8 @@ class ReceiptRepository(BaseRepository[Receipt]):
             error_message=row['error_message'],
             created_at=self._parse_datetime(row['created_at']),
             updated_at=self._parse_datetime(row['updated_at']),
+            worker_id=worker_id,
+            period_id=period_id,
         )
     
     def _model_to_dict(self, model: Receipt) -> dict:

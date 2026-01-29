@@ -495,7 +495,7 @@ def page_period_closure():
             st.metric("Sin Match", stats.unmatched_receipts)
         with col3:
             st.metric("Conflictos", stats.conflicts)
-            st.metric("Pendientes", stats.pending_receipts)
+            st.metric("Imágenes sin procesar", stats.unprocessed_images)
         with col4:
             st.metric("Transacciones", stats.total_transactions)
             st.metric("Trans. Matched", stats.matched_transactions)
@@ -511,31 +511,23 @@ def page_period_closure():
         
         st.write("**Validación de Cierre:**")
         
+        # Build checks from validation results
         checks = [
-            ("CSV cargado", validation['csv_uploaded']),
-            ("Sin recibos pendientes", validation['no_pending_receipts']),
-            ("Sin recibos sin match", validation['no_unmatched_receipts']),
-            ("Sin conflictos", validation['no_conflicts'])
+            ("CSV cargado", 'No se ha cargado ningún archivo CSV bancario' not in validation['blocking_reasons']),
+            ("Todos los recibos procesados", validation['can_close']),  # Simplified for now
         ]
         
-        all_valid = all(check[1] for check in checks)
+        all_valid = validation['can_close']
         
         for check_name, is_valid in checks:
             icon = "✅" if is_valid else "❌"
             st.write(f"{icon} {check_name}")
         
-        if not all_valid:
-            st.error("❌ No se puede cerrar el periodo. Corrige los problemas arriba.")
-            
-            # Show details of issues
-            if not validation['csv_uploaded']:
-                st.warning("⚠️ Debes cargar al menos un CSV bancario antes de cerrar el periodo")
-            if not validation['no_pending_receipts']:
-                st.warning(f"⚠️ Hay {stats.pending_receipts} recibos sin procesar")
-            if not validation['no_unmatched_receipts']:
-                st.warning(f"⚠️ Hay {stats.unmatched_receipts} recibos sin match")
-            if not validation['no_conflicts']:
-                st.warning(f"⚠️ Hay {stats.conflicts} conflictos sin resolver")
+        # Show blocking reasons if any
+        if validation['blocking_reasons']:
+            st.error("❌ No se puede cerrar el periodo:")
+            for reason in validation['blocking_reasons']:
+                st.write(f"  • {reason}")
         else:
             st.success("✅ Periodo listo para cerrar")
             

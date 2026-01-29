@@ -13,6 +13,7 @@ from src.services.bank_matching_service import BankMatchingService
 from src.services.statistics_service import StatisticsService
 from src.services.export_service import ExportService
 from src.repositories.ignored_repository import IgnoredRepository
+from src.repositories.period_repository import PeriodRepository
 from src.core.database import get_database
 from src.core.logging import setup_logging
 from src.core.backup_manager import BackupManager
@@ -39,6 +40,12 @@ def init_session_state():
         db = get_database(config.paths.get('database'))
         st.session_state.ignored_repo = IgnoredRepository(db)
     
+    # Initialize period_repo for multi-worker support
+    if 'period_repo' not in st.session_state:
+        config = st.session_state.config
+        db = get_database(config.paths.get('database'))
+        st.session_state.period_repo = PeriodRepository(db)
+    
     if 'current_index' not in st.session_state:
         st.session_state.current_index = 0
     
@@ -64,9 +71,16 @@ def page_receipts():
     receipt_service = st.session_state.receipt_service
     matching_service = st.session_state.matching_service
     ignored_repo = st.session_state.ignored_repo
+    period_repo = st.session_state.period_repo
     
-    # Get all receipts
-    all_receipts = receipt_service.repository.get_all()
+    # Get active period if exists
+    active_period = period_repo.get_active_processing_period()
+    
+    # Get receipts (filtered by active period if exists)
+    if active_period:
+        all_receipts = receipt_service.repository.get_by_period(active_period.id)
+    else:
+        all_receipts = receipt_service.repository.get_all()
     
     # Apply filters
     filtered_receipts = all_receipts
@@ -353,12 +367,22 @@ def page_bank_transactions():
     
     matching_service = st.session_state.matching_service
     receipt_service = st.session_state.receipt_service
-    
+    period_repo = st.session_state.period_repo
+    active_period = period_repo.get_active_processing_period()
+    period_id = active_period.id if active_period else None
+
     # Load bank transactions (fresh from database)
-    transactions = matching_service.bank_repo.get_all()
+    if period_id:
+        transactions = matching_service.bank_repo.get_by_period(period_id)
+    else:
+        transactions = matching_service.bank_repo.get_all()
     
+    if active_period:
+        st.caption(f"Active Period: {active_period.month_year}")
+
     if not transactions:
-        st.warning("No bank transactions found. Load transactions from Excel first.")
+        period_note = f" for period {active_period.month_year}" if active_period else ""
+        st.warning(f"No bank transactions found{period_note}. Load transactions from Excel first.")
         
         if st.button("📂 Load from Excel"):
             try:
@@ -374,10 +398,16 @@ def page_bank_transactions():
                 st.error(f"Failed to load Excel: {e}")
         return
     
-    # Get all matches for lookup
+    # Get matches relevant to the current view (filtered by period if active)
     all_matches = matching_service.match_repo.get_all()
+    if period_id:
+        period_txn_ids = {txn.id for txn in transactions}
+        filtered_matches = [m for m in all_matches if m.transaction_id in period_txn_ids]
+    else:
+        filtered_matches = all_matches
+
     match_by_bank_id = {}
-    for match in all_matches:
+    for match in filtered_matches:
         if match.transaction_id:
             match_by_bank_id[match.transaction_id] = match
 
@@ -521,8 +551,8 @@ def page_bank_transactions():
         st.caption("Select receipts above to enable batch detach")
     
     st.caption(f"📊 Total: {len(transactions)} transactions | "
-               f"✅ Matched: {sum(1 for m in all_matches if m.transaction_id and not m.is_conflict)} | "
-               f"⚠️ Conflicts: {sum(1 for m in all_matches if m.transaction_id and m.is_conflict)} | "
+               f"✅ Matched: {sum(1 for m in filtered_matches if m.transaction_id and not m.is_conflict)} | "
+               f"⚠️ Conflicts: {sum(1 for m in filtered_matches if m.transaction_id and m.is_conflict)} | "
                f"❌ Unmatched: {len(transactions) - len(match_by_bank_id)}")
     
     st.divider()
@@ -561,7 +591,16 @@ def page_bank_transactions():
 
     # Compute unmatched receipts (exclude ignored by default)
     try:
-        all_receipts = receipt_service.repository.get_all()
+        # Get active period if exists
+        period_repo = st.session_state.period_repo
+        active_period = period_repo.get_active_processing_period()
+        
+        # Get receipts (filtered by active period if exists)
+        if active_period:
+            all_receipts = receipt_service.repository.get_by_period(active_period.id)
+        else:
+            all_receipts = receipt_service.repository.get_all()
+        
         ignored_ids = st.session_state.ignored_repo.get_all_ignored_ids()
         unmatched_receipts = []
         for r in all_receipts:
@@ -693,10 +732,15 @@ def page_statistics():
     st.header("📊 Statistics")
     
     stats_service = st.session_state.stats_service
+    period_repo = st.session_state.period_repo
     
-    # Get statistics
+    # Get active period if exists
+    active_period = period_repo.get_active_processing_period()
+    period_id = active_period.id if active_period else None
+    
+    # Get statistics (filtered by period if active)
     try:
-        summary = stats_service.get_dashboard_summary()
+        summary = stats_service.get_dashboard_summary(period_id)
     except Exception as e:
         st.error(f"Failed to load statistics: {e}")
         return
@@ -714,10 +758,12 @@ def page_statistics():
         total_amount = receipt_stats.get('total_amount', 0)
         st.metric("Total Amount", f"€{total_amount:.2f}")
     with col3:
-        matched_count = matching_stats.get('matched_count', 0)
+        # Total matches from matching stats
+        matched_count = matching_stats.get('total_matches', 0)
         st.metric("Matched", matched_count)
     with col4:
-        unmatched_count = matching_stats.get('unmatched_count', 0)
+        # Unmatched from bank stats
+        unmatched_count = bank_stats.get('unmatched_count', 0)
         st.metric("Unmatched", unmatched_count)
     
     st.divider()
@@ -726,16 +772,20 @@ def page_statistics():
     col1, col2, col3, col4 = st.columns(4)
     
     with col1:
-        conflict_count = matching_stats.get('conflict_count', 0)
+        # Conflicts from matching stats
+        conflict_count = matching_stats.get('conflicts', 0)
         st.metric("Conflicts", conflict_count)
     with col2:
-        pending_count = receipt_stats.get('pending_count', 0)
-        st.metric("Pending Processing", pending_count)
+        # Accepted conflicts from matching stats
+        accepted_conflicts = matching_stats.get('accepted_conflicts', 0)
+        st.metric("Conflicts Accepted", accepted_conflicts)
     with col3:
-        ignored_count = receipt_stats.get('ignored_count', 0)
+        # Ignored count from summary
+        ignored_count = summary.get('ignored_count', 0)
         st.metric("Ignored", ignored_count)
     with col4:
-        bank_count = bank_stats.get('total_count', 0)
+        # Bank transactions total
+        bank_count = bank_stats.get('total_transactions', 0)
         st.metric("Bank Transactions", bank_count)
     
     st.divider()
@@ -766,7 +816,8 @@ def page_statistics():
     with col2:
         st.subheader("Match Distribution")
         
-        match_dist = matching_stats.get('by_type', {})
+        # Use match_type_breakdown from matching stats
+        match_dist = matching_stats.get('match_type_breakdown', {})
         if match_dist:
             import pandas as pd
             
@@ -791,13 +842,15 @@ def page_statistics():
         
         table_data = []
         for receipt_type, stats in type_breakdown.items():
+            count = stats.get('count', 0)
+            total = stats.get('total_amount', 0)
+            avg = total / count if count > 0 else 0
+            
             table_data.append({
                 'Type': receipt_type,
-                'Count': stats.get('count', 0),
-                'Total Amount': f"€{stats.get('total_amount', 0):.2f}",
-                'Avg Amount': f"€{stats.get('avg_amount', 0):.2f}",
-                'Min Amount': f"€{stats.get('min_amount', 0):.2f}",
-                'Max Amount': f"€{stats.get('max_amount', 0):.2f}"
+                'Count': count,
+                'Total Amount': f"€{total:.2f}",
+                'Avg Amount': f"€{avg:.2f}"
             })
         
         df_table = pd.DataFrame(table_data)
@@ -1292,6 +1345,20 @@ def main():
         st.session_state.nav_page = st.session_state.pending_nav_page
         del st.session_state.pending_nav_page
 
+    # Show active period info in sidebar
+    period_repo = st.session_state.period_repo
+    active_period = period_repo.get_active_processing_period()
+    if active_period:
+        from src.repositories.worker_repository import WorkerRepository
+        worker_repo = WorkerRepository(st.session_state.period_repo.db)
+        worker = worker_repo.get_by_id(active_period.worker_id)
+        worker_name = worker.nombre if worker else "Unknown"
+        st.sidebar.info(f"📋 **Active Period:** {worker_name} - {active_period.month_year}")
+    else:
+        st.sidebar.info("📋 **No Active Period** (showing all data)")
+    
+    st.sidebar.divider()
+    
     # Navigation
     page = st.sidebar.selectbox(
         "Navigation",

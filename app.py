@@ -32,7 +32,8 @@ from modules import (
     rocskincare_csv_upload,
     rocskincare_period_closure,
     rocskincare_visualization,
-    admin_page
+    admin_page,
+    admin_test_receipt,
 )
 
 
@@ -146,6 +147,15 @@ def main():
                 label_visibility="collapsed"
             )
             st.session_state.sub_page = sub_page
+        elif st.session_state.main_module == "Admin":
+            st.subheader("Administración")
+            sub_page = st.radio(
+                "Páginas:",
+                ["⚙️ Administración", "🧪 Test Receipt"],
+                key='admin_sub_nav',
+                label_visibility="collapsed"
+            )
+            st.session_state.sub_page = sub_page
         else:
             st.session_state.sub_page = None
         
@@ -184,7 +194,10 @@ def main():
         elif st.session_state.sub_page == "📊 Visualización":
             rocskincare_visualization.render()    
     elif st.session_state.main_module == "Admin":
-        admin_page.render()
+        if st.session_state.sub_page == "🧪 Test Receipt":
+            admin_test_receipt.render()
+        else:
+            admin_page.render()
 
 if __name__ == "__main__":
     main()

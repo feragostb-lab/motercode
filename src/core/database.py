@@ -105,6 +105,13 @@ class Database:
                 logger.info("Adding receipt_type column to bank_transactions table")
                 cursor.execute("ALTER TABLE bank_transactions ADD COLUMN receipt_type TEXT")
             
+            # Migration: add csv_row_number to bank_transactions if missing
+            try:
+                cursor.execute("SELECT csv_row_number FROM bank_transactions LIMIT 1")
+            except sqlite3.OperationalError:
+                logger.info("Adding csv_row_number column to bank_transactions table")
+                cursor.execute("ALTER TABLE bank_transactions ADD COLUMN csv_row_number INTEGER")
+            
             # Matches table
             cursor.execute('''
                 CREATE TABLE IF NOT EXISTS matches (

@@ -20,6 +20,8 @@ from src.core.config import get_config
 from src.ocr_processor import BackgroundOCRProcessor
 from src.services.queue_service import QueueService
 from src.utils.file_helpers import get_image_files
+from src.repositories.period_repository import PeriodRepository
+from src.repositories.worker_repository import WorkerRepository
 
 
 from src.core.logging import setup_logging
@@ -52,6 +54,9 @@ def main():
     processor = st.session_state.processor
     queue_service = st.session_state.queue_service
     config = st.session_state.config
+    period_repo = PeriodRepository(queue_service.db)
+    active_period = period_repo.get_active_processing_period()
+    period_id = active_period.id if active_period else None
     
     # Main layout
     col1, col2 = st.columns([2, 1])
@@ -126,7 +131,18 @@ def main():
         
         # Queue management
         st.subheader("📁 Input Files")
-        
+
+        if active_period:
+            worker_repo = WorkerRepository(queue_service.db)
+            worker = worker_repo.get_by_id(active_period.worker_id)
+            worker_name = worker.nombre if worker else "Desconocido"
+            st.info(
+                f"📅 Periodo activo: {active_period.month_year}"
+                f" · Trabajador: {worker_name}"
+            )
+        else:
+            st.info("⚠️ Sin periodo activo. Se usará la cola global.")
+
         input_dir = st.text_input(
             "Input Directory",
             value=config.paths.get('input_dir', './img'),
@@ -135,14 +151,17 @@ def main():
         
         if st.button("🔄 Scan & Enqueue Images"):
             image_files = get_image_files(input_dir)
-            count = queue_service.enqueue_batch(image_files)
+            count = queue_service.enqueue_batch(image_files, period_id=period_id)
             st.success(f"Enqueued {count} images")
             st.rerun()
         
-        # Warning for large queue
-        queue_stats = queue_service.get_queue_stats()
+        # Warning for large queue (filtered by period)
+        queue_stats = queue_service.get_queue_stats(period_id)
         if queue_stats.get('warning', False):
-            st.warning(f"⚠️ Large queue: {queue_stats['pending']} pending items (threshold: {queue_stats['warning_threshold']})")
+            message = f"⚠️ Large queue: {queue_stats['pending']} pending items (threshold: {queue_stats['warning_threshold']})"
+            if active_period:
+                message += f" · Periodo {active_period.month_year}"
+            st.warning(message)
         
         st.divider()
         

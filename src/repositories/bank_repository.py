@@ -22,6 +22,7 @@ class BankRepository(BaseRepository[BankTransaction]):
             reference=row['reference'],
             receipt_type=row['receipt_type'] if 'receipt_type' in row.keys() else "",
             matched_receipt_id=row['matched_receipt_id'],
+            csv_row_number=row['csv_row_number'] if 'csv_row_number' in row.keys() else None,
             created_at=self._parse_datetime(row['created_at']),
         )
     
@@ -235,7 +236,12 @@ class BankRepository(BaseRepository[BankTransaction]):
     def bulk_create_with_period(self, transactions: List[BankTransaction], 
                                 worker_id: int, period_id: int, 
                                 csv_file_path: str, csv_upload_date: str) -> int:
-        """Bulk insert transactions with worker/period info (for CSV import)."""
+        """
+        Bulk insert transactions with worker/period info (for CSV import).
+        
+        CRITICAL: Preserves original CSV row numbers in csv_row_number field.
+        id is auto-generated to avoid conflicts between periods.
+        """
         with self.db.get_connection() as conn:
             cursor = conn.cursor()
             
@@ -249,14 +255,15 @@ class BankRepository(BaseRepository[BankTransaction]):
                 worker_id,
                 period_id,
                 csv_upload_date,
-                csv_file_path
+                csv_file_path,
+                t.csv_row_number  # Preserve original CSV row number
             ) for t in transactions]
             
             cursor.executemany('''
                 INSERT INTO bank_transactions 
                 (date, amount, description, reference, receipt_type, matched_receipt_id,
-                 worker_id, period_id, csv_upload_date, csv_file_path)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                 worker_id, period_id, csv_upload_date, csv_file_path, csv_row_number)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ''', data_list)
             
             return cursor.rowcount

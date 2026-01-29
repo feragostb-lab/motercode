@@ -30,14 +30,19 @@ class StatisticsService:
         self.match_repo = MatchRepository(self.db)
         self.ignored_repo = IgnoredRepository(self.db)
     
-    def get_receipt_statistics(self) -> Dict[str, Any]:
-        """
-        Get overall receipt statistics.
+    def get_receipt_statistics(self, period_id: int = None) -> Dict[str, Any]:
+        """Get overall receipt statistics.
+        
+        Args:
+            period_id: Optional period ID to filter by
         
         Returns:
             Dictionary with statistics
         """
-        receipts = self.receipt_repo.get_all()
+        if period_id:
+            receipts = self.receipt_repo.get_by_period(period_id)
+        else:
+            receipts = self.receipt_repo.get_all()
         
         if not receipts:
             return {
@@ -198,17 +203,19 @@ class StatisticsService:
         # TODO: Implement
         return []
     
-    def get_dashboard_summary(self) -> Dict[str, Any]:
-        """
-        Get comprehensive dashboard summary.
+    def get_dashboard_summary(self, period_id: int = None) -> Dict[str, Any]:
+        """Get comprehensive dashboard summary.
         
         Combines all statistics for dashboard display.
+        
+        Args:
+            period_id: Optional period ID to filter by
         
         Returns:
             Dictionary with all statistics
         """
         return {
-            'receipts': self.get_receipt_statistics(),
+            'receipts': self.get_receipt_statistics(period_id),
             'bank': self.get_bank_statistics(),
             'matching': self.get_matching_statistics(),
             'breakdown': self.get_breakdown_by_type(),

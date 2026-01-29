@@ -30,7 +30,7 @@ class QueueService:
         self.retry_backoff_base = queue_config.get('retry_backoff_base_minutes', 2)
         self.warning_threshold = queue_config.get('warning_threshold', 300)
     
-    def enqueue_file(self, file_path: str) -> ProcessingQueueItem:
+    def enqueue_file(self, file_path: str, period_id: Optional[int] = None) -> ProcessingQueueItem:
         """
         Add file to processing queue.
         
@@ -40,9 +40,9 @@ class QueueService:
         Returns:
             Queue item
         """
-        return self.repository.enqueue(file_path)
+        return self.repository.enqueue(file_path, period_id)
     
-    def enqueue_batch(self, file_paths: list) -> int:
+    def enqueue_batch(self, file_paths: list, period_id: Optional[int] = None) -> int:
         """
         Add multiple files to queue.
         
@@ -55,21 +55,21 @@ class QueueService:
         count = 0
         for file_path in file_paths:
             try:
-                self.repository.enqueue(file_path)
+                self.repository.enqueue(file_path, period_id)
                 count += 1
             except Exception as e:
                 logger.error(f"Failed to enqueue {file_path}: {e}")
         
         return count
     
-    def get_next_item(self) -> Optional[ProcessingQueueItem]:
+    def get_next_item(self, period_id: Optional[int] = None) -> Optional[ProcessingQueueItem]:
         """
         Get next pending item from queue (FIFO).
         
         Returns:
             Next queue item or None if queue empty
         """
-        return self.repository.get_next_pending()
+        return self.repository.get_next_pending(period_id)
     
     def start_processing(self, item_id: int) -> bool:
         """
@@ -129,6 +129,21 @@ class QueueService:
             logger.error(f"Item {item_id} permanently failed after {new_attempts} attempts: {error_message}")
             return False
     
+    def interrupt_item(self, item_id: int) -> bool:
+        """
+        Mark item as interrupted (for force stop - will be reset to pending).
+        
+        Args:
+            item_id: Queue item ID
+            
+        Returns:
+            True if successful
+        """
+        success = self.repository.mark_interrupted(item_id)
+        if success:
+            logger.info(f"Item {item_id} marked as interrupted (will be reset to pending)")
+        return success
+    
     def auto_reset_interrupted(self) -> int:
         """
         Reset interrupted items to pending (for crash recovery).
@@ -138,21 +153,21 @@ class QueueService:
         """
         return self.repository.auto_reset_interrupted()
     
-    def get_queue_stats(self) -> dict:
+    def get_queue_stats(self, period_id: Optional[int] = None) -> dict:
         """
         Get queue statistics.
         
         Returns:
             Dictionary with stats
         """
-        stats = self.repository.get_stats()
+        stats = self.repository.get_stats(period_id)
         stats['warning'] = stats.get('pending', 0) > self.warning_threshold
         stats['warning_threshold'] = self.warning_threshold
         return stats
     
-    def should_warn_large_queue(self) -> bool:
+    def should_warn_large_queue(self, period_id: Optional[int] = None) -> bool:
         """Check if pending items exceed warning threshold."""
-        pending_count = self.repository.get_pending_count()
+        pending_count = self.repository.get_pending_count(period_id)
         return pending_count > self.warning_threshold
     
     def clear_completed_items(self) -> int:

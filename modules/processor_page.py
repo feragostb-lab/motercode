@@ -39,9 +39,13 @@ def render():
     processor = st.session_state.processor
     queue_service = st.session_state.queue_service
     config = st.session_state.config
-    
+    period_repo = st.session_state.period_repo
+    worker_repo = st.session_state.worker_repo
+    active_period = period_repo.get_active_processing_period()
+    period_id = active_period.id if active_period else None
+
     # Check for failed items and show warning
-    queue_stats = queue_service.get_queue_stats()
+    queue_stats = queue_service.get_queue_stats(period_id)
     failed_count = queue_stats.get('failed', 0)
     if failed_count > 0:
         st.warning(f"⚠️ Hay {failed_count} items fallidos. [Ir a Items Fallidos](javascript:void(0))", icon="⚠️")
@@ -82,8 +86,11 @@ def render():
         # Control buttons
         btn_col1, btn_col2, btn_col3 = st.columns(3)
         
+        # Check actual running state
+        is_running = processor.is_actually_running()
+        
         with btn_col1:
-            if st.button("▶️ Start", disabled=processor._is_running, use_container_width=True):
+            if st.button("▶️ Start", disabled=is_running, use_container_width=True):
                 try:
                     processor.start()
                     st.success("Processor started!")
@@ -92,7 +99,7 @@ def render():
                     st.error(f"Failed to start: {e}")
         
         with btn_col2:
-            if processor._is_running:
+            if is_running:
                 if processor._is_paused:
                     if st.button("▶️ Resume", use_container_width=True):
                         processor.resume()
@@ -107,7 +114,7 @@ def render():
                 st.button("⏸️ Pause", disabled=True, use_container_width=True)
         
         with btn_col3:
-            if st.button("⏹️ Stop", disabled=not processor._is_running, use_container_width=True):
+            if st.button("⏹️ Stop", disabled=not is_running, use_container_width=True):
                 processor.stop(force=True)
                 st.warning("⚠️ Procesamiento detenido forzosamente")
                 time.sleep(1)
@@ -118,10 +125,7 @@ def render():
         # Queue management
         st.subheader("📁 Input Files")
         
-        # Get active period info
-        period_repo = st.session_state.period_repo
-        worker_repo = st.session_state.worker_repo
-        active_period = period_repo.get_active_processing_period()
+        # Active period info already determined above
         
         if active_period:
             worker = worker_repo.get_by_id(active_period.worker_id)
@@ -140,14 +144,17 @@ def render():
         
         if st.button("🔄 Scan & Enqueue Images"):
             image_files = get_image_files(str(input_dir))
-            count = queue_service.enqueue_batch(image_files)
+            count = queue_service.enqueue_batch(image_files, period_id=period_id)
             st.success(f"Enqueued {count} images")
             st.rerun()
         
         # Warning for large queue
-        queue_stats = queue_service.get_queue_stats()
+        queue_stats = queue_service.get_queue_stats(period_id)
         if queue_stats.get('warning', False):
-            st.warning(f"⚠️ Large queue: {queue_stats['pending']} pending items (threshold: {queue_stats['warning_threshold']})")
+            warning_msg = f"⚠️ Large queue: {queue_stats['pending']} pending items (threshold: {queue_stats['warning_threshold']})"
+            if active_period:
+                warning_msg += f" · Periodo {active_period.month_year}"
+            st.warning(warning_msg)
         
         st.divider()
         
@@ -229,7 +236,8 @@ def render():
         resource_stats = stats.get('resources', {})
         
         # Status indicators
-        status_text = "🟢 Running" if processor._is_running else "🔴 Stopped"
+        is_running = stats.get('is_running', False)
+        status_text = "🟢 Running" if is_running else "🔴 Stopped"
         if processor._is_paused:
             status_text = "🟡 Paused"
         st.metric("Status", status_text)
@@ -264,7 +272,8 @@ def render():
     # Progress and ETA
     st.divider()
     
-    if processor._is_running:
+    is_running = stats.get('is_running', False)
+    if is_running:
         total = queue_stats.get('pending', 0) + queue_stats.get('completed', 0)
         completed = queue_stats.get('completed', 0)
         
@@ -293,6 +302,6 @@ def render():
             st.session_state.start_time = None
     
     # Auto-refresh when running
-    if processor._is_running:
+    if stats.get('is_running', False):
         time.sleep(2)
         st.rerun()

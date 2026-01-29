@@ -25,6 +25,12 @@ class ConfigService:
         self.config_path = Path(config_path)
         self._config_data = None
         self._load_config()
+        
+        # Initialize database connection for system config
+        from ..core.config import get_config
+        from ..core.database import get_database
+        config = get_config(config_path)
+        self.db = get_database(config.paths.get('database'))
     
     def _load_config(self):
         """Load configuration from YAML file."""
@@ -96,6 +102,55 @@ class ConfigService:
             error_msg = f"Error saving type definitions: {str(e)}"
             logger.error(error_msg)
             return False, error_msg
+    
+    def get_system_config(self, key: str) -> Optional[str]:
+        """
+        Get system configuration value.
+        
+        Args:
+            key: Configuration key
+            
+        Returns:
+            Configuration value or None
+        """
+        with self.db.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS system_config (
+                    key TEXT PRIMARY KEY,
+                    value TEXT,
+                    updated_at TEXT
+                )
+            ''')
+            cursor.execute('SELECT value FROM system_config WHERE key = ?', (key,))
+            row = cursor.fetchone()
+            return row['value'] if row else None
+    
+    def set_system_config(self, key: str, value: Optional[str]):
+        """
+        Set system configuration value.
+        
+        Args:
+            key: Configuration key
+            value: Configuration value (None to delete)
+        """
+        with self.db.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS system_config (
+                    key TEXT PRIMARY KEY,
+                    value TEXT,
+                    updated_at TEXT
+                )
+            ''')
+            
+            if value is None:
+                cursor.execute('DELETE FROM system_config WHERE key = ?', (key,))
+            else:
+                cursor.execute('''
+                    INSERT OR REPLACE INTO system_config (key, value, updated_at)
+                    VALUES (?, ?, ?)
+                ''', (key, value, datetime.now().isoformat()))
     
     def _validate_type_definitions(self, type_definitions: List[Dict[str, Any]]) -> Optional[str]:
         """

@@ -3,6 +3,7 @@ import logging
 import threading
 import time
 import json
+import os
 from pathlib import Path
 from typing import Optional, Callable, Dict, Any
 from datetime import datetime
@@ -23,6 +24,10 @@ from src.utils.formatters import normalizar_fecha, normalizar_monto, generar_nom
 from src.models.domain import Receipt, ProcessingStatus
 
 logger = logging.getLogger(__name__)
+
+# Thread and PID tracking for processor state persistence
+PROCESSOR_THREAD_NAME = "BackgroundOCRProcessor-Worker"
+PROCESSOR_PID_KEY = "processor_pid"
 
 
 class BackgroundOCRProcessor:
@@ -72,6 +77,41 @@ class BackgroundOCRProcessor:
             'failed': 0,
             'started_at': None,
         }
+        
+        # Sync state with actual running status
+        self._sync_running_state()
+    
+    def _sync_running_state(self):
+        """
+        Synchronize _is_running state with actual thread status.
+        Detects if processor is already running from a previous session.
+        """
+        # Check if worker thread exists in current process
+        for thread in threading.enumerate():
+            if thread.name == PROCESSOR_THREAD_NAME and thread.is_alive():
+                self._is_running = True
+                self._worker_thread = thread
+                logger.info("🔄 Detected running processor thread from previous session")
+                return
+        
+        # Check if another process is running (via PID in database)
+        stored_pid = self.config_service.get_system_config(PROCESSOR_PID_KEY)
+        current_pid = os.getpid()
+        
+        if stored_pid:
+            try:
+                stored_pid_int = int(stored_pid)
+                # Check if process exists and has processing items
+                if stored_pid_int != current_pid:
+                    queue_stats = self.queue_service.get_queue_stats()
+                    if queue_stats.get('processing', 0) > 0:
+                        logger.warning(f"⚠️ Another process (PID {stored_pid_int}) may be running the processor")
+                        # We don't set _is_running=True here because it's another process
+                    else:
+                        # Clear stale PID
+                        self.config_service.set_system_config(PROCESSOR_PID_KEY, None)
+            except (ValueError, TypeError):
+                pass
     
     def startup(self):
         """
@@ -160,15 +200,20 @@ class BackgroundOCRProcessor:
         self._is_running = True
         self.stats['started_at'] = datetime.now()
         
+        # Save PID to database
+        self.config_service.set_system_config(PROCESSOR_PID_KEY, str(os.getpid()))
+        
         # Log clear start message
         logger.info("="*80)
         logger.info(f"📅 INICIO DEL PROCESO: {self.stats['started_at'].strftime('%Y-%m-%d %H:%M:%S')}")
+        logger.info(f"🔢 PID: {os.getpid()}")
         logger.info("="*80)
         
         self._worker_thread = threading.Thread(
             target=self._worker_loop,
             args=(progress_callback, notification_callback),
-            daemon=True
+            daemon=True,
+            name=PROCESSOR_THREAD_NAME
         )
         self._worker_thread.start()
         
@@ -189,6 +234,9 @@ class BackgroundOCRProcessor:
         
         if self._worker_thread:
             self._worker_thread.join(timeout=10)
+        
+        # Clear PID from database
+        self.config_service.set_system_config(PROCESSOR_PID_KEY, None)
         
         self._force_stop = False  # Reset flag
         logger.info("Background processor stopped")
@@ -216,15 +264,16 @@ class BackgroundOCRProcessor:
         
         while self._is_running:
             try:
-                # Check if paused
+                # Check if paused - don't get new items while paused
                 if self._is_paused:
-                    logger.debug("⏸️  Processor paused, waiting...")
+                    logger.info("⏸️  Processor is paused - not processing new items")
                     time.sleep(1)
                     continue
                 
-                # Get next item from queue
+                # Get next item from queue for the active period
                 logger.debug("🔍 Checking queue for next item...")
-                item = self.queue_service.get_next_item()
+                _, period_id = self._get_active_worker_and_period()
+                item = self.queue_service.get_next_item(period_id)
                 
                 if not item:
                     logger.debug("📭 Queue is empty, waiting for items...")
@@ -241,6 +290,11 @@ class BackgroundOCRProcessor:
                     result = self._process_item(item)
                     batch_processed += 1
                     
+                    # After processing, check if pause was requested
+                    if self._is_paused:
+                        logger.info("⏸️  Pause requested - stopping after completing current item")
+                        # Don't break, just continue to top of loop where it will wait
+                    
                     # Log result summary
                     if result:
                         logger.info(f"✅ {result}")
@@ -256,7 +310,7 @@ class BackgroundOCRProcessor:
                     logger.error(f"❌ Error processing item {item.id}: {e}", exc_info=True)
                 
                 # Check if batch complete
-                queue_stats = self.queue_service.get_queue_stats()
+                queue_stats = self.queue_service.get_queue_stats(period_id)
                 if queue_stats['pending'] == 0 and batch_processed > 0:
                     end_time = datetime.now()
                     elapsed = (end_time - batch_start).total_seconds()
@@ -554,6 +608,21 @@ class BackgroundOCRProcessor:
             
             return status_msg
             
+        except InterruptedError as e:
+            # Stop forzado - devolver item a pending
+            end_time = datetime.now()
+            elapsed = (end_time - start_time).total_seconds()
+            logger.warning(f"⏰ Fin: {end_time.strftime('%H:%M:%S')}")
+            logger.warning(f"⏱️  Tiempo: {elapsed:.1f}s")
+            logger.warning(f"⚠️ PROCESAMIENTO INTERRUMPIDO: {str(e)}")
+            try:
+                # Mark as interrupted, which will reset to pending
+                self.queue_service.interrupt_item(item.id)
+                logger.info(f"  ➜ Item {item.id} marcado como interrupted (devuelto a pending)")
+            except Exception as interrupt_error:
+                logger.error(f"Error marking item as interrupted: {interrupt_error}")
+            return None
+        
         except Exception as e:
             end_time = datetime.now()
             elapsed = (end_time - start_time).total_seconds()
@@ -576,6 +645,58 @@ class BackgroundOCRProcessor:
                     Path(temp_file).unlink(missing_ok=True)
                 except Exception as cleanup_error:
                     logger.warning(f"Failed to cleanup temp file: {cleanup_error}")
+
+    def analyze_image_for_test(self, image_path: str) -> dict[str, Any]:
+        """Analyze a single receipt image without persisting the result."""
+
+        img_path = Path(image_path)
+        if not img_path.exists():
+            raise FileNotFoundError(f"Imagen no encontrada: {image_path}")
+
+        logger.info(f"🧪 Ejecutando OCR de prueba en: {img_path.name}")
+        self._initialize_model()
+
+        try:
+            data_uri = f"data:image/jpeg;base64,{image_to_base64(img_path)}"
+            model_response = self._extract_with_simple_response(data_uri, stage=1)
+
+            if not model_response:
+                raise ValueError("No se obtuvo respuesta del modelo")
+
+            parsed_fields = self._parse_simple_response_to_dict(model_response, stage=1)
+            stage1_fields = parsed_fields.copy()
+
+            detected_categories = parsed_fields.get('_detected_categories') or []
+            if not detected_categories:
+                detected_categories = self._detect_yes_responses(parsed_fields)
+
+            auxiliary_fields: dict[str, Any] = {}
+            if len(detected_categories) >= 2:
+                auxiliary_result = self._ask_auxiliary_fields_text_only(detected_categories, parsed_fields)
+                if auxiliary_result:
+                    auxiliary_fields = auxiliary_result
+                    parsed_fields.update(auxiliary_result)
+
+            self._normalize_data(parsed_fields)
+            final_fields = parsed_fields.copy()
+
+            deduced_type = self.receipt_service.deduce_receipt_type(parsed_fields)
+
+            return {
+                'model_response': model_response,
+                'stage1_fields': stage1_fields,
+                'auxiliary_fields': auxiliary_fields,
+                'final_fields': final_fields,
+                'detected_categories': detected_categories,
+                'deduced_type': deduced_type
+            }
+
+        finally:
+            if self._llm:
+                try:
+                    self._llm.reset()
+                except Exception as reset_error:
+                    logger.warning(f"Error resetting VLM context after test run: {reset_error}")
     
     def _extract_with_simple_response(self, data_uri: str, stage: int) -> Optional[str]:
         """
@@ -1203,16 +1324,45 @@ Si no encaja en ninguna categoría, usa null en "categorias"."""
             logger.error(f"Error getting active worker/period: {e}")
             return (None, None)
     
+    def is_actually_running(self) -> bool:
+        """
+        Check if processor is actually running (not just _is_running flag).
+        
+        Returns:
+            True if worker thread is alive
+        """
+        if self._worker_thread and self._worker_thread.is_alive():
+            return True
+        
+        # Check if any thread with our name exists
+        for thread in threading.enumerate():
+            if thread.name == PROCESSOR_THREAD_NAME and thread.is_alive():
+                self._worker_thread = thread
+                self._is_running = True
+                return True
+        
+        # If we thought we were running but thread is dead, update state
+        if self._is_running:
+            logger.warning("⚠️ Processor marked as running but thread is dead - correcting state")
+            self._is_running = False
+            self.config_service.set_system_config(PROCESSOR_PID_KEY, None)
+        
+        return False
+    
     def get_stats(self) -> dict:
         """Get processing statistics."""
-        queue_stats = self.queue_service.get_queue_stats()
+        _, period_id = self._get_active_worker_and_period()
+        queue_stats = self.queue_service.get_queue_stats(period_id)
         resource_usage = self.resource_monitor.get_current_usage()
+        
+        # Update running state based on actual thread status
+        actual_running = self.is_actually_running()
         
         return {
             **self.stats,
             'queue': queue_stats,
             'resources': resource_usage,
-            'is_running': self._is_running,
+            'is_running': actual_running,
             'is_paused': self._is_paused,
         }
     

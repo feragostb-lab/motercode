@@ -487,10 +487,16 @@ class BankMatchingService:
         
         # Read and process CSV (assuming Spanish date format dd/mm/yyyy)
         try:
-            df = pd.read_excel(csv_file_path, skiprows=13) if csv_file_path.endswith('.xlsx') else pd.read_csv(csv_file_path)
+            skiprows = 13 if csv_file_path.endswith('.xlsx') else 0
+            df = pd.read_excel(csv_file_path, skiprows=skiprows) if csv_file_path.endswith('.xlsx') else pd.read_csv(csv_file_path)
             
             # Clean column names
             df.columns = ['fecha', 'descripcion', 'metodo', 'importe']
+            
+            # CRITICAL: Preserve original CSV row number BEFORE filtering
+            # For Excel: skiprows=13 means first data row is line 14 (1-indexed in Excel)
+            # For CSV: first data row is line 2 (after header)
+            df['csv_row_number'] = range(skiprows + 2, skiprows + 2 + len(df))
             
             # Remove rows with no date
             df = df[df['fecha'].notna()].copy()
@@ -536,12 +542,15 @@ class BankMatchingService:
         deleted_count = self.bank_repo.clear_by_period(period_id)
         logger.info(f"Deleted {deleted_count} previous transactions for period {period_id}")
         
-        # Create transaction objects
+        # Create transaction objects with explicit IDs from CSV row order
         transactions = []
         upload_date = datetime.now().isoformat()
         
+        # CRITICAL: Preserve ORIGINAL CSV row number in csv_row_number field
+        # id will be auto-generated to avoid conflicts between periods
         for _, row in df.iterrows():
             transaction = BankTransaction(
+                csv_row_number=row['csv_row_number'],  # Preserve original CSV row number
                 date=row['fecha_procesada'].to_pydatetime(),
                 amount=row['importe_procesado'],
                 description=str(row['descripcion']) if pd.notna(row['descripcion']) else None,
@@ -586,9 +595,7 @@ class BankMatchingService:
         
         # Clear existing matches for this period's receipts
         for receipt in receipts:
-            existing_match = self.match_repo.get_by_receipt_id(receipt.id)
-            if existing_match:
-                self.match_repo.delete(existing_match.id)
+            self.match_repo.delete_by_receipt_id(receipt.id)
         
         # Perform matching
         for receipt in receipts:

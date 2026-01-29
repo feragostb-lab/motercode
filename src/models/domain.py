@@ -44,6 +44,8 @@ class Receipt:
     error_message: Optional[str] = None
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
+    worker_id: Optional[int] = None
+    period_id: Optional[int] = None
     
     def to_dict(self) -> Dict[str, Any]:
         """Convert receipt to dictionary."""
@@ -60,6 +62,8 @@ class Receipt:
             'error_message': self.error_message,
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'updated_at': self.updated_at.isoformat() if self.updated_at else None,
+            'worker_id': self.worker_id,
+            'period_id': self.period_id,
         }
 
 
@@ -73,6 +77,7 @@ class BankTransaction:
     reference: str = ""
     receipt_type: str = ""
     matched_receipt_id: Optional[int] = None
+    csv_row_number: Optional[int] = None  # Original row number in CSV/Excel file
     created_at: Optional[datetime] = None
     
     def to_dict(self) -> Dict[str, Any]:
@@ -85,6 +90,7 @@ class BankTransaction:
             'reference': self.reference,
             'receipt_type': self.receipt_type,
             'matched_receipt_id': self.matched_receipt_id,
+            'csv_row_number': self.csv_row_number,
             'created_at': self.created_at.isoformat() if self.created_at else None,
         }
 
@@ -126,6 +132,7 @@ class ProcessingQueueItem:
     created_at: Optional[datetime] = None
     started_at: Optional[datetime] = None
     processed_at: Optional[datetime] = None
+    period_id: Optional[int] = None
     
     def to_dict(self) -> Dict[str, Any]:
         """Convert queue item to dictionary."""
@@ -138,6 +145,7 @@ class ProcessingQueueItem:
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'started_at': self.started_at.isoformat() if self.started_at else None,
             'processed_at': self.processed_at.isoformat() if self.processed_at else None,
+            'period_id': self.period_id,
         }
 
 
