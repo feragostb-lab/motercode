@@ -61,10 +61,10 @@ def render():
                 st.write(f"**Intentos:** {item.attempts}/{queue_service.max_attempts}")
                 
                 if item.created_at:
-                    st.write(f"**Creado:** {item.created_at.strftime('%Y-%m-%d %H:%M:%S')}")
+                    st.write(f"**Creado:** {item.created_at.strftime('%d-%m-%Y %H:%M:%S')}")
                 
                 if item.processed_at:
-                    st.write(f"**Último intento:** {item.processed_at.strftime('%Y-%m-%d %H:%M:%S')}")
+                    st.write(f"**Último intento:** {item.processed_at.strftime('%d-%m-%Y %H:%M:%S')}")
                 
                 if item.last_error:
                     st.write(f"**Error almacenado:** `{item.last_error}`")

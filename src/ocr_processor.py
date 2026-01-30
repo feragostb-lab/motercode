@@ -272,7 +272,14 @@ class BackgroundOCRProcessor:
                 
                 # Get next item from queue for the active period
                 logger.debug("🔍 Checking queue for next item...")
-                _, period_id = self._get_active_worker_and_period()
+                worker_id, period_id = self._get_active_worker_and_period()
+                
+                # Ensure there is an active period before attempting to process
+                if not period_id:
+                    logger.debug("📭 No active period found, waiting...")
+                    time.sleep(2)
+                    continue
+                    
                 item = self.queue_service.get_next_item(period_id)
                 
                 if not item:
@@ -285,9 +292,9 @@ class BackgroundOCRProcessor:
                     logger.warning("⚠️ Force stop detected, aborting queue processing")
                     break
                 
-                # Process the item
+                # Process the item (passing worker_id and period_id to avoid re-querying)
                 try:
-                    result = self._process_item(item)
+                    result = self._process_item(item, worker_id, period_id)
                     batch_processed += 1
                     
                     # After processing, check if pause was requested
@@ -342,12 +349,14 @@ class BackgroundOCRProcessor:
         
         logger.info("🛑 Worker loop stopped")
     
-    def _process_item(self, item) -> str:
+    def _process_item(self, item, worker_id: int, period_id: int) -> str:
         """
         Process a single queue item.
         
         Args:
             item: ProcessingQueueItem
+            worker_id: Active worker ID (passed from thread to avoid re-querying)
+            period_id: Active period ID (passed from thread to avoid re-querying)
             
         Returns:
             Status message string
@@ -516,32 +525,25 @@ class BackgroundOCRProcessor:
             description = extracted_data.get('empresa', '') or ''
             
             # ===== ROC SKINCARE: Multi-worker period support =====
-            # Determine worker and period for this receipt
-            worker_id, period_id = self._get_active_worker_and_period()
-            
+            # worker_id and period_id are passed as parameters (already validated in _worker_loop)
             # Determine output directory based on active period
-            output_dir = None
-            if worker_id and period_id:
-                from src.repositories.period_repository import PeriodRepository
-                from src.repositories.worker_repository import WorkerRepository
-                from src.utils.file_helpers import get_period_paths
-                
-                period_repo = PeriodRepository(self.db)
-                worker_repo = WorkerRepository(self.db)
-                
-                period = period_repo.get_by_id(period_id)
-                worker = worker_repo.get_by_id(worker_id)
-                
-                if period and worker:
-                    # Use period-specific result directory
-                    paths = get_period_paths(worker.nombre, period.month_year)
-                    output_dir = paths['result']
-                    logger.debug(f"  ➜ Using period directory: {output_dir}")
+            from src.repositories.period_repository import PeriodRepository
+            from src.repositories.worker_repository import WorkerRepository
+            from src.utils.file_helpers import get_period_paths
             
-            # Fallback to default output directory if no active period
-            if output_dir is None:
-                output_dir = Path(self.config.paths.get('output_dir', './result'))
-                logger.debug(f"  ➜ Using default directory: {output_dir}")
+            period_repo = PeriodRepository(self.db)
+            worker_repo = WorkerRepository(self.db)
+            
+            period = period_repo.get_by_id(period_id)
+            worker = worker_repo.get_by_id(worker_id)
+            
+            if not period or not worker:
+                raise ValueError(f"Worker o periodo no encontrado (worker_id={worker_id}, period_id={period_id})")
+            
+            # Use period-specific result directory
+            paths = get_period_paths(worker.nombre, period.month_year)
+            output_dir = paths['result']
+            logger.debug(f"  ➜ Using period directory: {output_dir}")
             
             output_dir.mkdir(parents=True, exist_ok=True)
             
@@ -787,12 +789,12 @@ class BackgroundOCRProcessor:
             
             response = self._llm.create_chat_completion(
                 messages=[
-                    {"role": "system", "content": "Eres un experto en extracción de datos de recibos. Tu salida debe ser exclusivamente JSON válido sin texto adicional."},
+                    {"role": "system", "content": "Eres un motor de extracción de datos experto. Tu prioridad es analizar los ítems de línea del recibo para determinar la naturaleza del gasto. Responde solo con JSON válido."},
                     {
                         "role": "user",
                         "content": [
-                            {"type": "text", "text": prompt},
-                            {"type": "image_url", "image_url": {"url": data_uri}}
+                            {"type": "image_url", "image_url": {"url": data_uri}},
+                            {"type": "text", "text": prompt}
                         ]
                     }
                 ],
@@ -1176,15 +1178,43 @@ class BackgroundOCRProcessor:
         categories = [type_def.name for type_def in enabled_types]
         categories_str = ", ".join(categories)
         
-        prompt = (
-            "Analiza el recibo y clasifícalo según esta lista: "
-            f"[{categories_str}].\n\n"
-            "Regla: Solo incluye categorías con un nivel de confianza superior al 9%.\n\n"
-            "Devuelve exclusivamente este formato JSON (sin texto adicional):\n"
-            "{\n"
-            '    "categorias": "lista de categorías separadas por comas"\n'
-            "}"
-        )
+        prompt = f"""ROL: OCR Experto. TAREA: Extraer datos y clasificar recibos.
+OBJETIVO: Priorizar EVIDENCIA DE ÍTEMS sobre el logo de la empresa.
+
+--- PROTOCOLO DE CLASIFICACIÓN (Orden Estricto 1-4) ---
+1. COCHE: ¿Contiene "Diesel", "Gasolina", "Litros", "Surtidor"? 
+   -> SI: Categoría = "Coche". FIN.
+
+2. ESTACIONAMIENTO: ¿Contiene "MATRÍCULA", "SÓTANO", "ESTANCIA" (en horas/minutos) o "PARKING"?
+   -> SI: Categoría = "Estacionamiento". (Ignora si dice "Hotel"). FIN.
+
+3. COMIDAS: ¿Ítems son SOLO comida/bebida ("Café", "Agua", "Menú")?
+   -> SI: Categoría = "Comidas". (Ignora si es Hotel/Gasolinera). FIN.
+
+4. HOTELES: ¿Ítems son "Alojamiento", "Habitación", "Noche"?
+   -> SI: Categoría = "Hoteles".
+
+--- EXTRACCIÓN DE DATOS ---
+- NIF: Prioridad Emisor. Ignorar DNI cliente.
+- FECHA: DD/MM/YYYY. (/25 = 2025).
+- DESC: Texto literal del concepto principal.
+- TOTAL: Float (ej: 12.50).
+
+--- FORMATO SALIDA (JSON PURO) ---
+Responde SOLO con este JSON:
+{{
+  "basicos": {{
+    "empresa": "string",
+    "nif": "string o null",
+    "total": number,
+    "moneda": "EUR",
+    "fecha": "string",
+    "hora": "string",
+    "desc": "string",
+    "factura": "string"
+  }},
+  "categorias": "Valor exacto de: [{categories_str}]"
+}}"""
         
         return prompt
     
@@ -1417,7 +1447,7 @@ class BackgroundOCRProcessor:
             from src.utils.formatters import normalizar_fecha
             normalized = normalizar_fecha(fecha_raw)
             if normalized:
-                data['fecha'] = normalized.strftime('%d/%m/%Y')
+                data['fecha'] = normalized.strftime('%d-%m-%Y')
         
         # Normalize amount
         importe_raw = data.get('total', data.get('Total', data.get('Importe Total', '')))

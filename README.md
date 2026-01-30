@@ -1,520 +1,182 @@
-# 📊 Sistema de Procesamiento de Recibos con IA - Aplicación Unificada
+# 🧾 Receipt Management System
 
-Sistema automatizado para procesar recibos mediante OCR con Vision Language Model (VLM) y gestionar coincidencias con movimientos bancarios.
+Sistema automatizado para procesar recibos mediante OCR con IA (Vision Language Model) y gestionar coincidencias con transacciones bancarias.
 
-## 🎯 **NUEVO: Aplicación Unificada**
+## 🚀 Inicio Rápido
 
-El sistema ahora incluye una aplicación unificada que integra los tres módulos principales en un solo punto de entrada:
+### Ejecutar la Aplicación
 
 ```bash
+# Aplicación unificada (RECOMENDADO)
 streamlit run app.py
 ```
 
-**Módulos integrados:**
-- 🖼️ **OCR Processor** - Procesamiento automático de imágenes
-- 📊 **Dashboard** - Revisión y gestión de recibos
+La aplicación unificada integra cuatro módulos principales:
+- 🖼️ **OCR Processor** - Procesamiento automático de recibos
+- 📊 **Dashboard** - Revisión y gestión de datos
 - 👥 **ROC Skincare** - Gestión multi-trabajador/multi-periodo
-
-📖 **Ver [README_UNIFIED.md](README_UNIFIED.md) para la documentación completa de la aplicación unificada.**
-
----
-
-## 🌟 Características Principales
-
-### Procesamiento Automático
-- **OCR con IA**: Utiliza Qwen2.5-VL-7B para extracción inteligente de datos
-- **Detección Automática**: Clasifica recibos (taxis, comidas, hoteles, etc.)
-- **Procesamiento en Cola**: Sistema FIFO con reintentos automáticos
-- **Gestión de Recursos**: Monitoreo CPU/RAM con boost automático cuando el PC está inactivo
-
-### Coincidencia Bancaria
-- **Matching Exacto**: Por fecha y monto con tolerancia configurable (±2%)
-- **Detección de Conflictos**: Identifica múltiples recibos para la misma transacción
-- **Recalculación Masiva**: Actualiza todas las coincidencias con un clic
-
-### Panel de Control
-- **Revisión de Recibos**: Navegación imagen por imagen con edición manual
-- **Estadísticas en Tiempo Real**: Métricas de procesamiento y coincidencias
-- **Exportación**: Excel/CSV con todos los datos
-
-### Gestión Multi-Trabajador (ROC Skincare)
-- **Múltiples Trabajadores**: Gestión independiente por persona
-- **Periodos Mensuales**: Control de periodos separados
-- **CSV Incremental**: Cargas múltiples con re-matching automático
-- **Cierre de Periodos**: Exportación y snapshot de datos
-
-### Gestión de Datos
-- **Base de Datos SQLite**: Persistencia local sin configuración
-- **Backups Automáticos**: Rotación de copias de seguridad (7 días)
-- **Recuperación de Errores**: Reinicio automático de procesos interrumpidos
-- **Logs Detallados**: Trazabilidad completa del procesamiento
-
-## 📋 Requisitos del Sistema
-
-### Hardware Mínimo
-- **CPU**: 4 núcleos (8 recomendado)
-- **RAM**: 8 GB (16 GB recomendado para modo turbo)
-- **Disco**: 10 GB libres (modelos GGUF + datos)
-- **GPU**: Opcional (CUDA compatible para aceleración)
-
-### Software
-- **Sistema Operativo**: Windows 10/11, Linux, macOS
-- **Python**: 3.9 o superior (3.11+ recomendado)
-- **Dependencias**: Ver `requirements.txt`
-
-## 🚀 Instalación Rápida
-
-### Paso 1: Clonar y Preparar Entorno
-```bash
-# 1. Clonar proyecto
-cd C:\WORKSPACE\gguf
-
-# 2. Crear entorno virtual
-python -m venv .venv
-.venv\Scripts\activate  # Windows
-# source .venv/bin/activate  # Linux/macOS
-
-# 3. Instalar dependencias
-pip install -r requirements.txt
-
-# 4. Descargar modelos GGUF (ver sección siguiente)
-
-# 5. Auto-configuración (detecta hardware)
-python scripts/setup_config.py
-
-# 6. (Opcional) Configurar ROC Skincare
-python scripts/setup_rocskincare.py
-
-# 7. Ejecutar aplicación unificada
-streamlit run app.py
-```
-
-### Paso 2: Descarga de Modelos GGUF
-
-**Modelos requeridos** (descargar en carpeta `models/`):
-
-1. **Modelo Principal**: `Qwen_Qwen2.5-VL-7B-Instruct-Q4_K_M.gguf` (~4.5 GB)
-2. **Proyector Multimodal**: `mmproj-Qwen2.5-VL-7B-Instruct-f16.gguf` (~600 MB)
-
-**Fuente**: [Hugging Face - Qwen2.5-VL-7B-Instruct-GGUF](https://huggingface.co/Qwen/Qwen2.5-VL-7B-Instruct-GGUF)
-
-```bash
-# Estructura esperada:
-models/
-├── Qwen_Qwen2.5-VL-7B-Instruct-Q4_K_M.gguf
-└── mmproj-Qwen2.5-VL-7B-Instruct-f16.gguf
-```
+- ⚙️ **Administración** - Herramientas de configuración y testing
 
 ### Aplicaciones Legacy (Separadas)
 
-Si prefieres ejecutar las aplicaciones por separado:
-
 ```bash
-streamlit run app_processor.py   # Procesador OCR
-streamlit run app_dashboard.py   # Dashboard
-streamlit run app_rocskincare.py  # ROC Skincare
+streamlit run app_processor.py   # Solo procesador OCR
+streamlit run app_dashboard.py   # Solo dashboard
+streamlit run app_rocskincare.py  # Solo ROC Skincare
 ```
 
-**Recomendación**: Usa `app.py` para una mejor experiencia integrada.
+## 📚 Documentación
+
+### 📖 [USER_GUIDE.md](USER_GUIDE.md) - Guía del Usuario
+**Para usuarios finales del sistema**
+- Cómo usar cada módulo de la aplicación
+- Navegación y flujos de trabajo
+- Gestión de recibos, transacciones y trabajadores
+- Configuración básica
+
+### 🔧 [DEVELOPER_GUIDE.md](DEVELOPER_GUIDE.md) - Guía Técnica
+**Para desarrolladores y administradores del sistema**
+- Instalación completa y requisitos
+- Configuración avanzada (config.yaml)
+- Arquitectura y estructura del código
+- Base de datos y migraciones
+- Testing y build de ejecutables
+- Troubleshooting detallado
+
+### 📁 Documentación Adicional
+
+- [doc/IMPLEMENTATION_GUIDE.md](doc/IMPLEMENTATION_GUIDE.md) - Detalles de implementación
+- [doc/README_ROCSKINCARE.md](doc/README_ROCSKINCARE.md) - Documentación ROC Skincare
+- [doc/ADMIN_PANEL_FEATURES.md](doc/ADMIN_PANEL_FEATURES.md) - Features del panel admin
+- [TEST_GUIDE.md](TEST_GUIDE.md) - Guía de testing
+
+## 🌟 Características Principales
+
+- **OCR con IA** - Extracción inteligente de datos con Qwen2.5-VL-7B
+- **Procesamiento Automático** - Cola FIFO con gestión de reintentos
+- **Matching Bancario** - Coincidencia automática con transacciones
+- **Multi-Trabajador** - Gestión de múltiples trabajadores y periodos
+- **Gestión de Recursos** - Modo turbo automático cuando el PC está inactivo
+- **Exportación** - Reportes en Excel/CSV
+- **Base de Datos SQLite** - Persistencia local sin configuración
+
+## ⚡ Instalación Rápida
+
+```bash
+# 1. Crear entorno virtual
+python -m venv .venv
+.venv\Scripts\activate
+
+# 2. Instalar dependencias
+pip install -r requirements.txt
+
+# 3. Descargar modelos GGUF en ./models/
+# Ver DEVELOPER_GUIDE.md para enlaces de descarga
+
+# 4. Auto-configuración
+python scripts/setup_config.py
+
+# 5. Ejecutar aplicación
+streamlit run app.py
+```
+
+> 💡 **Nota**: Los modelos GGUF deben descargarse desde [Hugging Face](https://huggingface.co/Qwen/Qwen2.5-VL-7B-Instruct-GGUF) (~5 GB)
 
 ## 📁 Estructura del Proyecto
 
 ```
 gguf/
-├── models/                           # Modelos GGUF (5 GB)
-│   ├── Qwen_Qwen2.5-VL-7B-Instruct-Q4_K_M.gguf
-│   └── mmproj-Qwen2.5-VL-7B-Instruct-f16.gguf
-├── img/                              # Imágenes de entrada
-│   └── bankmov/                      # Excel de transacciones bancarias
-├── result/                           # Recibos procesados (renombrados)
-├── logs/                             # Logs de aplicaciones
-│   ├── processor.log                 # Procesador OCR
-│   └── dashboard.log                 # Dashboard
-├── backups/                          # Backups automáticos (rotación 7 días)
-├── exports/                          # Exportaciones Excel/CSV
-├── temp/                             # Archivos temporales (seguro eliminar)
-├── src/                              # Código fuente modular
-│   ├── core/                         # Funcionalidades core
-│   │   ├── config.py                 # Gestión config.yaml
-│   │   ├── database.py               # Manager SQLite
-│   │   ├── backup_manager.py         # Backups automáticos
-│   │   ├── resource_manager.py       # Monitor CPU/RAM
-│   │   └── logging.py                # Logging centralizado
-│   ├── models/                       # Modelos de datos (dataclasses)
-│   │   └── domain.py                 # Receipt, Transaction, Match, etc.
-│   ├── repositories/                 # Capa de acceso a datos
-│   │   ├── receipt_repository.py
-│   │   ├── bank_repository.py
-│   │   ├── match_repository.py
-│   │   ├── queue_repository.py
-│   │   └── ignored_repository.py
-│   ├── services/                     # Lógica de negocio
-│   │   ├── receipt_service.py        # Gestión de recibos
-│   │   ├── bank_matching_service.py  # Algoritmo matching
-│   │   ├── queue_service.py          # Gestión cola FIFO
-│   │   ├── statistics_service.py     # Métricas y reportes
-│   │   └── export_service.py         # Exportación datos
-│   ├── utils/                        # Utilidades
-│   │   ├── formatters.py             # Formato fecha/importe
-│   │   └── file_helpers.py           # Procesamiento imágenes
-│   └── ocr_processor.py              # Motor OCR con llama.cpp
-├── scripts/                          # Scripts de mantenimiento
-│   ├── setup_config.py               # Auto-configuración hardware
-│   └── migrate_from_json.py          # Migración datos antiguos
-├── tests/                            # Suite de tests (75 tests, 44% coverage)
-│   ├── conftest.py                   # Fixtures compartidos
-│   ├── unit/                         # Tests unitarios (servicios)
-│   └── integration/                  # Tests integración (repositorios)
-├── build_config/                     # Configuraciones PyInstaller
-│   ├── processor.spec
-│   ├── dashboard.spec
-│   └── setup.spec
-├── app_processor.py                  # UI Procesador (Streamlit)
-├── app_dashboard.py                  # UI Dashboard (Streamlit)
-├── config.yaml                       # Configuración principal
-├── receipts.db                       # Base de datos SQLite
-├── requirements.txt                  # Dependencias Python
-└── pytest.ini                        # Configuración tests
+├── app.py                    # ✨ Aplicación unificada (punto de entrada)
+├── modules/                  # Páginas modulares de la aplicación
+├── src/                      # Código fuente
+│   ├── core/                 # Componentes centrales
+│   ├── models/               # Modelos de datos
+│   ├── repositories/         # Acceso a datos
+│   ├── services/             # Lógica de negocio
+│   └── utils/                # Utilidades
+├── scripts/                  # Scripts de mantenimiento
+├── tests/                    # Suite de tests
+├── models/                   # Modelos GGUF (descargar aparte)
+├── config.yaml               # Configuración principal
+└── receipts.db               # Base de datos SQLite
 ```
 
-## ⚙️ Configuración
+Ver [DEVELOPER_GUIDE.md](DEVELOPER_GUIDE.md) para la estructura completa.
 
-### config.yaml - Configuración Principal
+## ⚙️ Configuración Básica
 
-El archivo `config.yaml` contiene toda la configuración del sistema:
+El archivo `config.yaml` contiene la configuración del sistema:
 
 ```yaml
-processor:
-  threads: 8                   # Threads CPU (auto-detectado por setup_config.py)
-  batch_size: 2048             # Tamaño de batch para procesamiento
-  gpu_layers: 35               # Capas en GPU (0 = solo CPU, 35 = todas en GPU)
-  max_cpu_percent: 70          # Límite CPU modo normal (70% para multitarea)
-  max_ram_percent: 70          # Límite RAM modo normal (70%)
-  idle_boost_enabled: true     # Activar boost automático cuando PC idle
-  idle_cpu_percent: 95         # Límite CPU en modo boost (95%)
-  idle_ram_percent: 95         # Límite RAM en modo boost (95%)
-  idle_timeout_seconds: 300    # Tiempo inactivo para activar boost (5 min)
-  max_image_size_kb: 150       # Tamaño máximo de imagen para procesar
-  
-queue:
-  max_attempts: 3              # Reintentos máximos por error antes de marcar como fallido
-  warning_threshold: 300       # Advertir si cola > 300 items pendientes
-  
 paths:
-  input_dir: ./img             # Carpeta de entrada para imágenes
-  output_dir: ./result         # Carpeta de salida (recibos renombrados)
-  database: ./receipts.db      # Archivo de base de datos SQLite
-  bank_excel: ./img/bankmov/Detalle de Tarjeta de Crédito.xlsx  # Transacciones bancarias
-  temp_dir: ./temp             # Archivos temporales
-  backup_dir: ./backups        # Backups automáticos
-  export_dir: ./exports        # Exportaciones Excel/CSV
-  
-backup:
-  enabled: true                # Activar backups automáticos
-  retention_days: 7            # Días de retención (elimina backups antiguos)
-  backup_on_startup: true      # Backup al iniciar procesador
-  
-matching:
-  amount_tolerance: 0.02       # Tolerancia de coincidencia (±2% del importe)
-  exact_date_match: true       # Requiere fecha exacta para matching
-  
-logging:
-  level: INFO                  # Nivel de logging (DEBUG, INFO, WARNING, ERROR)
-  max_file_size_mb: 10         # Tamaño máximo de archivo de log
-  backup_count: 5              # Número de archivos de log rotados
-  
-receipt_types:                # Tipos de recibo disponibles
-  - taxis
-  - comidas
-  - hoteles
-  - estacionamiento
-  - vuelos
-  - alquiler_coche
-  - gasolina
-  - tren
-  - peajes
-  - otros
+  input_dir: "./img"          # Imágenes de entrada
+  result_dir: "./result"      # Recibos procesados
+  database: "./receipts.db"   # Base de datos
+
+processor:
+  max_cpu_percent: 70         # Límite CPU (70% normal, 95% turbo)
+  max_ram_percent: 70         # Límite RAM
+  idle_boost_enabled: true    # Boost automático cuando idle
+
+model:
+  model_path: "./models/Qwen_Qwen2.5-VL-7B-Instruct-Q4_K_M.gguf"
+  n_gpu_layers: 33            # 0 para solo CPU, 33 para GPU
 ```
 
-### Ajustes Manuales
-
-**Para mejorar rendimiento**:
-- Aumentar `threads` si tienes CPU potente
-- Aumentar `batch_size` si tienes mucha RAM
-- Ajustar `gpu_layers` según VRAM disponible
-
-**Para reducir uso de recursos**:
-- Reducir `max_cpu_percent` y `max_ram_percent` (ej: 50%)
-- Desactivar `idle_boost_enabled: false`
-- Reducir `max_image_size_kb` (ej: 100)
-
-**Para matching más flexible**:
-- Aumentar `amount_tolerance` (ej: 0.05 = ±5%)
-- Cambiar `exact_date_match: false` (permite ±1 día)
-
-**Para añadir tipos de recibo personalizados**:
-```yaml
-receipt_types:
-  - tu_tipo_personalizado  # Añadir al final de la lista
-```
-
-## 🖥️ Uso del Sistema
-
-### 1. Procesador de Recibos (app_processor.py)
-
-**Iniciar**:
-```bash
-streamlit run app_processor.py
-```
-
-**Panel de Control**:
-- ▶️ **Start** - Iniciar procesamiento de la cola
-- ⏸️ **Pause** - Pausar después del recibo actual (se puede reanudar)
-- ⏹️ **Stop** - Detener inmediatamente (forzado)
-- 🔄 **Toggle Normal/Turbo** - Cambiar modo de recursos
-
-**Gestión de Cola**:
-- **🔄 Scan & Enqueue Images** - Escanea carpeta `img/` y añade a cola
-- Muestra: Pendientes, Procesando, Completados, Fallidos
-- **Reset Interrupted** - Reintenta items interrumpidos (crashes)
-- **Clear Completed** - Limpia items completados de la base de datos
-
-**Logs en Tiempo Real**:
-- **Registro de Actividad** - Eventos principales (inicio, fin, resúmenes)
-- **Debug Logs** - Salida completa (incluye logs internos de llama.cpp)
-- Auto-scroll para seguir últimos mensajes
-
-**Estadísticas**:
-- Estado del procesador (Running/Paused/Stopped)
-- Modo de recursos (Normal 70% / Turbo 95%)
-- Uso de CPU y RAM en tiempo real
-- Imágenes procesadas / Total en cola
-- ETA estimado de finalización
-
-**Modos de Operación**:
-
-**Modo Normal (70% recursos)**:
-- Para uso mientras trabajas en otras tareas
-- Procesamiento en segundo plano
-- ~30-60 segundos por recibo
-- No ralentiza el sistema
-
-**Modo Turbo (95% recursos)**:
-- Para procesamiento masivo dedicado
-- Máximo rendimiento
-- ~15-30 segundos por recibo
-- Requiere PC dedicado
-
-**Modo Automático** (recomendado):
-- Detecta inactividad del sistema (5 minutos sin usar)
-- Cambia automáticamente a Turbo
-- Vuelve a Normal al detectar actividad
-- Configurar `idle_boost_enabled: true` en config.yaml
-
-**Flujo de Trabajo Típico**:
-1. Colocar imágenes de recibos en `./img/`
-2. Ejecutar `streamlit run app_processor.py`
-3. Clic en "🔄 Scan & Enqueue Images" (muestra N imágenes añadidas)
-4. Clic en "▶️ Start" para iniciar procesamiento
-5. Monitorear progreso en logs y estadísticas
-6. Recibos procesados aparecen en `./result/` con formato `YYMMDD_IMPORTE_TIPO.ext`
-7. Puedes cerrar la ventana, la cola se guarda (reanudar después)
-8. Notificación al completar (Windows Toast)
-
-**Solución de Problemas**:
-- **Cola no avanza**: Verificar logs, puede haber error en imagen específica
-- **Uso alto de RAM**: Reducir `max_image_size_kb` en config.yaml
-- **Muy lento**: Activar modo Turbo o ajustar `threads` en config
-- **Items fallidos**: Usar "Reset Interrupted" para reintentar (máx 3 intentos)
-
-### 2. Dashboard de Revisión (app_dashboard.py)
-
-**Páginas:**
-
-**📄 Receipts (Revisión)**
-- Navegar por recibos procesados (◀️ Prev | Next ▶️)
-- Ver imagen del recibo
-- Editar tipo, fecha, monto
-- Marcar como ignorado
-- Ver coincidencia bancaria
-- Aceptar conflictos
-
-**🏦 Bank Transactions**
-- Tabla de transacciones bancarias
-- Estados: Matched ✅ | Unmatched ⚠️ | Conflict 🔴
-- Botón para recargar desde Excel
-- Recalcular coincidencias
-
-**📊 Statistics**
-- Total recibos, montos
-- Breakdown por tipo (taxis, comidas, hoteles...)
-- Gráficas de distribución
-- Tasa de coincidencia
-
-**📤 Export**
-- Exportar todo a Excel/CSV
-- Exportar solo transacciones sin coincidencia
-- Descargar archivo generado
-
-## 🔧 Tareas de Mantenimiento
-
-### Migración de Datos Antiguos
-
-Si tienes datos en JSON del sistema anterior:
-
-```bash
-python scripts/migrate_from_json.py
-```
-
-Lee:
-- `result/historial_procesamiento.json` → `receipts` table
-- `result/recibos_ignorados.json` → `ignored_receipts` table
-- `result/conflictos_aceptados.json` → `matches` table
-
-### Backup Manual
-
-Backups automáticos se crean al iniciar el procesador. Para backup manual:
-
-```python
-from src.core.backup_manager import BackupManager
-
-backup = BackupManager('./receipts.db', './backups', retention_days=7)
-backup.perform_backup_with_cleanup()
-```
-
-### Limpieza de Cola
-
-Si la cola tiene muchos items completados:
-
-```python
-from src.services.queue_service import QueueService
-
-queue_service = QueueService(config)
-removed = queue_service.clear_completed_items()
-print(f"Removed {removed} completed items")
-```
+Ver [DEVELOPER_GUIDE.md](DEVELOPER_GUIDE.md) para configuración avanzada.
 
 ## 🧪 Testing
 
 ```bash
-# Ejecutar todos los tests
+# Ejecutar tests
 pytest
 
 # Con coverage
 pytest --cov=src --cov-report=html
-
-# Solo tests unitarios
-pytest -m unit
-
-# Solo tests de integración
-pytest -m integration
 ```
 
-Tests incluidos:
-- Repositories (CRUD operations)
-- Services (business logic)
-- Queue (FIFO, retry, recovery)
-- Formatters (date/amount normalization)
-
-## 🏗️ Build (Crear Ejecutables)
-
-Para crear los `.exe`:
+## 📦 Build (Crear Ejecutables)
 
 ```bash
-# Activar entorno virtual
-.venv\Scripts\activate
-
-# Ejecutar build
+# Crear ejecutables con PyInstaller
 build.bat
 ```
 
-Genera en `dist/`:
-- `RecibosProcessor.exe` (~500MB + modelos externos)
-- `RecibosDashboard.exe` (~400MB)
-- `ConfigSetup.exe` (~50MB)
+Genera archivos .exe en `dist/` para distribución.
 
-**Importante:** Los modelos `.gguf` NO se incluyen en el .exe (son muy grandes). Deben estar en carpeta `models/` relativa al ejecutable.
+## ❓ Ayuda y Soporte
 
-## 📝 Arquitectura Técnica
+- **Problemas de uso**: Ver [USER_GUIDE.md](USER_GUIDE.md)
+- **Problemas técnicos**: Ver [DEVELOPER_GUIDE.md](DEVELOPER_GUIDE.md) - Sección Troubleshooting
+- **Issues**: Reportar en el repositorio
 
-### Capas
+## 📝 Changelog
 
-1. **UI Layer** (Streamlit)
-   - `app_processor.py` - Control del procesador
-   - `app_dashboard.py` - Dashboard de revisión
+### v2.0 - Aplicación Unificada (Enero 2026)
+- ✨ Nueva aplicación unificada con navegación integrada
+- 🎨 Arquitectura modular mejorada
+- ⚙️ Panel de administración y herramientas de testing
+- 🖼️ Carga de imágenes para ROC Skincare
+- ❌ Gestión de items fallidos
+- 📚 Documentación reorganizada
 
-2. **Services Layer** (Business Logic)
-   - `ReceiptService` - CRUD y renombrado de recibos
-   - `BankMatchingService` - Algoritmo de coincidencia
-   - `QueueService` - Gestión de cola con retry
-   - `StatisticsService` - Agregaciones y reportes
-   - `ExportService` - Exportación a Excel/CSV
+### v1.0 - Versión Inicial
+- Aplicaciones independientes por módulo
+- Funcionalidad completa de procesamiento OCR
+- Dashboard de revisión
+- Sistema ROC Skincare multi-trabajador
 
-3. **Repositories Layer** (Data Access)
-   - `ReceiptRepository` - Acceso a recibos
-   - `BankRepository` - Transacciones bancarias
-   - `MatchRepository` - Coincidencias
-   - `QueueRepository` - Cola de procesamiento
-   - `IgnoredRepository` - Recibos ignorados
+## 👨‍💻 Autor
 
-4. **Core Layer**
-   - `Database` - Gestión de SQLite
-   - `Config` - Configuración YAML
-   - `BackupManager` - Backups automáticos
-   - `ResourceMonitor` - Monitoreo CPU/RAM con boost
-
-5. **Models Layer**
-   - `Receipt`, `BankTransaction`, `Match`, `ProcessingQueueItem`
-
-### Tecnologías
-
-- **Backend**: Python 3.10+
-- **UI**: Streamlit
-- **Database**: SQLite 3
-- **VLM**: llama.cpp + Qwen2.5-VL-7B
-- **Data**: pandas, openpyxl
-- **System**: psutil (resources), win10toast (notifications), pystray (tray)
-- **Build**: PyInstaller
-- **Testing**: pytest, pytest-cov
-
-## ❓ Troubleshooting
-
-### Error: "Model file not found"
-- Verificar que modelos `.gguf` están en carpeta `models/`
-- Revisar rutas en `config.yaml`
-
-### Error: "GPU not detected"
-- Normal si no tienes GPU NVIDIA
-- El sistema usará CPU (más lento pero funciona)
-- Ajustar `gpu_layers: 0` en config.yaml
-
-### Procesamiento muy lento
-- Ejecutar `ConfigSetup.exe` para reconfigurar
-- Verificar que boost automático está activo
-- Dejar el PC idle (>5 min sin uso) para activar modo boost
-
-### Cola no avanza
-- Revisar logs en `logs/processor.log`
-- Verificar items en estado "interrupted": ejecutar auto-reset
-- Revisar disco lleno o permisos
-
-### Dashboard no muestra recibos
-- Verificar que `receipts.db` existe y tiene datos
-- Ejecutar migración: `python scripts/migrate_from_json.py`
-- Revisar logs de la aplicación
+Sistema desarrollado para la gestión automatizada de recibos y transacciones bancarias.
 
 ## 📄 Licencia
 
-[Especificar licencia según necesidad]
-
-## 🤝 Contribución
-
-Para contribuir al proyecto:
-1. Implementar TODOs marcados en el código
-2. Añadir tests para nuevas funcionalidades
-3. Actualizar documentación
-4. Mantener separación de capas (UI → Services → Repositories)
+[Especificar licencia]
 
 ---
 
-**Desarrollado con ❤️ para simplificar la gestión de recibos empresariales**
+**Documentación organizada:**
+- 📖 [USER_GUIDE.md](USER_GUIDE.md) - Guía para usuarios finales  
+- 🔧 [DEVELOPER_GUIDE.md](DEVELOPER_GUIDE.md) - Guía para desarrolladores
+- 📚 [doc/](doc/) - Documentación adicional

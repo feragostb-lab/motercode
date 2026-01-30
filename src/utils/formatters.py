@@ -19,10 +19,12 @@ def normalizar_fecha(fecha_str) -> Optional[datetime]:
         return None
     
     formatos = [
+        '%d-%m-%Y',  # dd-mm-yyyy (formato preferido)
         '%d/%m/%Y',
         '%d.%m.%Y',
         '%Y-%m-%d',
         '%d/%m/%y',
+        '%d-%m-%y',
         '%d %b %y',
         '%d %B %y',
         '%d %b %Y',
@@ -113,7 +115,7 @@ def normalizar_monto(importe_str) -> Optional[Decimal]:
     return None
 
 
-def formatear_fecha(fecha: Optional[datetime], formato: str = '%d/%m/%Y') -> str:
+def formatear_fecha(fecha: Optional[datetime], formato: str = '%d-%m-%Y') -> str:
     """
     Format a datetime object to string.
     
@@ -199,7 +201,7 @@ def deduplicar_nombre_archivo(file_path: str, existing_files: list) -> str:
 
 def format_date_spanish(date: datetime) -> str:
     """
-    Format date in Spanish format: dd/mm/yyyy
+    Format date in Spanish format: dd-mm-yyyy
     
     Args:
         date: datetime object
@@ -209,12 +211,12 @@ def format_date_spanish(date: datetime) -> str:
     """
     if not date:
         return ""
-    return date.strftime('%d/%m/%Y')
+    return date.strftime('%d-%m-%Y')
 
 
 def format_datetime_spanish(dt: datetime) -> str:
     """
-    Format datetime in Spanish format: dd/mm/yyyy HH:MM:SS
+    Format datetime in Spanish format: dd-mm-yyyy HH:MM:SS
     
     Args:
         dt: datetime object
@@ -224,12 +226,12 @@ def format_datetime_spanish(dt: datetime) -> str:
     """
     if not dt:
         return ""
-    return dt.strftime('%d/%m/%Y %H:%M:%S')
+    return dt.strftime('%d-%m-%Y %H:%M:%S')
 
 
 def parse_date_spanish(date_str: str) -> Optional[datetime]:
     """
-    Parse Spanish date format: dd/mm/yyyy
+    Parse Spanish date format: dd-mm-yyyy
     
     Args:
         date_str: Date string
@@ -238,7 +240,7 @@ def parse_date_spanish(date_str: str) -> Optional[datetime]:
         datetime object or None if parse fails
     """
     try:
-        return datetime.strptime(date_str, '%d/%m/%Y')
+        return datetime.strptime(date_str, '%d-%m-%Y')
     except:
         return None
 

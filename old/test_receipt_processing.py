@@ -151,9 +151,19 @@ class ReceiptProcessingTester:
         start_time = datetime.now()
         processed_count = 0
         
+        # Get active worker and period for processing (validate before starting)
+        worker_id, period_id = self.processor._get_active_worker_and_period()
+        if not worker_id or not period_id:
+            self.logger.error("❌ No active worker/period found")
+            self.logger.error("   Please create and activate a period before running tests")
+            return
+        
+        self.logger.info(f"✓ Using active period ID: {period_id}")
+        self.logger.info("")
+        
         # Process items one by one
         while True:
-            item = self.queue_service.get_next_item()
+            item = self.queue_service.get_next_item(period_id)
             if not item:
                 break
             
@@ -175,8 +185,13 @@ class ReceiptProcessingTester:
                     self.logger.info("Loading VLM model (first time)...")
                     self.processor._initialize_model()
                 
+                # Get active worker and period for processing
+                worker_id, period_id = self.processor._get_active_worker_and_period()
+                if not worker_id or not period_id:
+                    raise ValueError("No active worker/period found. Please create and activate a period before testing.")
+                
                 # Process using the internal method
-                result = self.processor._process_item(item)
+                result = self.processor._process_item(item, worker_id, period_id)
                 
                 item_duration = (datetime.now() - item_start).total_seconds()
                 

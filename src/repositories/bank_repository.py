@@ -65,7 +65,7 @@ class BankRepository(BaseRepository[BankTransaction]):
         """Get all bank transactions."""
         with self.db.get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute('SELECT * FROM bank_transactions ORDER BY date DESC')
+            cursor.execute('SELECT * FROM bank_transactions ORDER BY id ASC')
             return [self._row_to_model(row) for row in cursor.fetchall()]
     
     def get_unmatched(self) -> List[BankTransaction]:

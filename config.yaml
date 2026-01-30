@@ -22,7 +22,7 @@ paths:
   exports_dir: ./exports
   input_dir: ./img
   logs_dir: ./logs
-  output_dir: ./result
+  # output_dir is now determined by worker/period (./workers/{worker}/{period}/result)
   temp_dir: ./temp
 processor:
   batch_size: 512
@@ -38,14 +38,13 @@ processor:
   max_tokens: 512
   mmproj_path: ./models/mmproj-Qwen2.5-VL-7B-Instruct-Q8_0.gguf
   model_path: ./models/Qwen_Qwen2.5-VL-7B-Instruct-Q4_K_M.gguf
-  tokenizer_path: ./models/tokenizer.json
   resource_check_interval_seconds: 5
   temperature: 0.1
   threads: 6
   # Image preprocessing configuration
   image_preprocessing:
     enable_grayscale: true
-    resize_factor: 672  # Resize longest side to this value (must be multiple of 28). Set to 0 to disable.
+    resize_factor: 784  # Resize longest side to this value (must be multiple of 28). Set to 0 to disable.
 queue:
   max_attempts: 3
   retry_backoff_base_minutes: 2
@@ -216,6 +215,8 @@ receipt_type_definitions:
     
     - name: "Taxis"
       enabled: true
+      normalized_type: "Ground Transit"
+      gl_account: "724000"
       direct_indicator:
         field_key: "taxi"
         question: "¿Es taxi, uber o similar?"
@@ -253,6 +254,8 @@ receipt_type_definitions:
     
     - name: "Hoteles"
       enabled: true
+      normalized_type: "Lodging"
+      gl_account: "723000"
       direct_indicator:
         field_key: "hotel"
         question: "¿Es hotel o alojamiento?"
@@ -290,6 +293,8 @@ receipt_type_definitions:
     
     - name: "Comidas"
       enabled: true
+      normalized_type: "Business Meals"
+      gl_account: "722000"
       direct_indicator:
         field_key: "restaurante"
         question: "¿Es restaurante , comida , cena , desayuno , cafeteria o bar?"
@@ -328,6 +333,8 @@ receipt_type_definitions:
     
     - name: "Vuelos"
       enabled: true
+      normalized_type: "Airfare"
+      gl_account: "721000"
       direct_indicator:
         field_key: "vuelo"
         question: "¿Es vuelo aéreo?"
@@ -351,6 +358,8 @@ receipt_type_definitions:
     
     - name: "Tren"
       enabled: true
+      normalized_type: "Train"
+      gl_account: "721000"
       direct_indicator:
         field_key: "tren"
         question: "¿Es billete de tren?"
@@ -373,6 +382,8 @@ receipt_type_definitions:
     
     - name: "Peaje"
       enabled: true
+      normalized_type: "Tolls"
+      gl_account: "724010"
       direct_indicator:
         field_key: "peaje"
         question: "¿Es peaje de autopista?"
@@ -394,6 +405,8 @@ receipt_type_definitions:
     
     - name: "Estacionamiento"
       enabled: true
+      normalized_type: "Parking"
+      gl_account: "724000"
       direct_indicator:
         field_key: "parking"
         question: "¿Es parking o estacionamiento?"
@@ -416,6 +429,8 @@ receipt_type_definitions:
     
     - name: "Coche"
       enabled: true
+      normalized_type: "Car Rental"
+      gl_account: "724000"
       direct_indicator:
         field_key: "alquiler_coche"
         question: "¿Es alquiler de coche?"
@@ -440,6 +455,8 @@ receipt_type_definitions:
     
     - name: "Productos competitivos"
       enabled: true
+      normalized_type: "Competitive Product"
+      gl_account: "672000"
       direct_indicator:
         field_key: "producto_competitivo"
         question: "¿Es compra de producto competitivo?"
@@ -449,6 +466,8 @@ receipt_type_definitions:
     
     - name: "Compra de Productos RoC"
       enabled: true
+      normalized_type: "RoC Product Purchase"
+      gl_account: "672100"
       direct_indicator:
         field_key: "producto_roc"
         question: "¿Es compra de producto RoC?"
@@ -458,6 +477,8 @@ receipt_type_definitions:
     
     - name: "Teléfono/Celular/Internet"
       enabled: true
+      normalized_type: "Phone/Cell/Internet"
+      gl_account: "725000"
       direct_indicator:
         field_key: "telefono"
         question: "¿Es factura de teléfono/internet?"
@@ -475,6 +496,8 @@ receipt_type_definitions:
     
     - name: "Entretenimiento"
       enabled: true
+      normalized_type: "Entertainment"
+      gl_account: "722000"
       direct_indicator:
         field_key: "entretenimiento"
         question: "¿Es gasto de entretenimiento?"
@@ -484,6 +507,8 @@ receipt_type_definitions:
     
     - name: "Kilometraje"
       enabled: true
+      normalized_type: "Mileage"
+      gl_account: "724000"
       direct_indicator:
         field_key: "kilometraje"
         question: "¿Es reembolso por kilometraje?"
@@ -498,6 +523,8 @@ receipt_type_definitions:
     
     - name: "Conferencias y Eventos"
       enabled: true
+      normalized_type: "Conference and Event Expense"
+      gl_account: "750500"
       direct_indicator:
         field_key: "conferencia"
         question: "¿Es gasto de conferencia o evento?"
@@ -507,6 +534,8 @@ receipt_type_definitions:
     
     - name: "Membresías y Publicaciones"
       enabled: true
+      normalized_type: "Memberships & Publications"
+      gl_account: "751000"
       direct_indicator:
         field_key: "membresia"
         question: "¿Es membresía o publicación?"
@@ -516,6 +545,8 @@ receipt_type_definitions:
     
     - name: "Suscripciones"
       enabled: true
+      normalized_type: "Dues & Subscriptions"
+      gl_account: "752000"
       direct_indicator:
         field_key: "suscripcion"
         question: "¿Es suscripción a servicio?"
@@ -525,6 +556,8 @@ receipt_type_definitions:
     
     - name: "Materiales de Oficina"
       enabled: true
+      normalized_type: "Office Supplies"
+      gl_account: "753000"
       direct_indicator:
         field_key: "material_oficina"
         question: "¿Es material de oficina?"
@@ -534,6 +567,8 @@ receipt_type_definitions:
     
     - name: "Envío Postal"
       enabled: true
+      normalized_type: "Postage"
+      gl_account: "753500"
       direct_indicator:
         field_key: "mensajeria"
         question: "¿Es envío postal o mensajería?"
@@ -551,6 +586,8 @@ receipt_type_definitions:
     
     - name: "Informática"
       enabled: true
+      normalized_type: "IT Expenses"
+      gl_account: "760000"
       direct_indicator:
         field_key: "informatica"
         question: "¿Es gasto de informática/hardware?"
@@ -560,6 +597,8 @@ receipt_type_definitions:
     
     - name: "Software"
       enabled: true
+      normalized_type: "Software Expense"
+      gl_account: "761000"
       direct_indicator:
         field_key: "software"
         question: "¿Es licencia o servicio de software?"

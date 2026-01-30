@@ -54,6 +54,13 @@ def init_session_state():
     
     if 'filter_match' not in st.session_state:
         st.session_state.filter_match = 'all'
+    
+    # Sorting state for receipts
+    if 'sort_by' not in st.session_state:
+        st.session_state.sort_by = None  # None, 'date', 'amount', or 'id'
+    
+    if 'sort_order' not in st.session_state:
+        st.session_state.sort_order = 'asc'  # 'asc' or 'desc'
 
     # Index for navigating unmatched receipts on Bank Transactions page
     if 'unmatched_index' not in st.session_state:
@@ -99,6 +106,30 @@ def page_receipts():
     if not st.session_state.get('show_ignored', False):
         ignored_ids = {i.receipt_id for i in ignored_repo.get_all()}
         filtered_receipts = [r for r in filtered_receipts if r.id not in ignored_ids]
+    
+    # Apply sorting
+    if st.session_state.sort_by:
+        sort_key = st.session_state.sort_by
+        reverse = st.session_state.sort_order == 'desc'
+        
+        if sort_key == 'id':
+            # Receipts with ID first, then without ID at the end
+            receipts_with_id = [r for r in filtered_receipts if r.id is not None]
+            receipts_without_id = [r for r in filtered_receipts if r.id is None]
+            receipts_with_id.sort(key=lambda x: x.id, reverse=reverse)
+            filtered_receipts = receipts_with_id + receipts_without_id
+        elif sort_key == 'date':
+            # Receipts with date first, then without date at the end
+            receipts_with_date = [r for r in filtered_receipts if r.date is not None]
+            receipts_without_date = [r for r in filtered_receipts if r.date is None]
+            receipts_with_date.sort(key=lambda x: x.date, reverse=reverse)
+            filtered_receipts = receipts_with_date + receipts_without_date
+        elif sort_key == 'amount':
+            # Receipts with amount first, then without amount at the end
+            receipts_with_amount = [r for r in filtered_receipts if r.amount is not None]
+            receipts_without_amount = [r for r in filtered_receipts if r.amount is None]
+            receipts_with_amount.sort(key=lambda x: x.amount, reverse=reverse)
+            filtered_receipts = receipts_with_amount + receipts_without_amount
 
     # Check if we need to navigate to a specific receipt ID
     if 'navigate_to_receipt_id' in st.session_state:
@@ -138,6 +169,73 @@ def page_receipts():
         col1, col2 = st.columns([2, 1])
         
         with col1:
+            # Sorting buttons
+            sort_col1, sort_col2, sort_col3, sort_col4 = st.columns([1, 1, 1, 2])
+            
+            with sort_col1:
+                # Date sort button
+                if st.session_state.sort_by == 'date':
+                    arrow = '↓' if st.session_state.sort_order == 'asc' else '↑'
+                    button_label = f"📅 Fecha {arrow}"
+                else:
+                    button_label = "📅 Fecha"
+                
+                if st.button(button_label, key="sort_date_btn"):
+                    if st.session_state.sort_by == 'date':
+                        # Toggle order
+                        st.session_state.sort_order = 'desc' if st.session_state.sort_order == 'asc' else 'asc'
+                    else:
+                        # Set new sort
+                        st.session_state.sort_by = 'date'
+                        st.session_state.sort_order = 'asc'
+                    st.rerun()
+            
+            with sort_col2:
+                # Amount sort button
+                if st.session_state.sort_by == 'amount':
+                    arrow = '↓' if st.session_state.sort_order == 'asc' else '↑'
+                    button_label = f"💰 Importe {arrow}"
+                else:
+                    button_label = "💰 Importe"
+                
+                if st.button(button_label, key="sort_amount_btn"):
+                    if st.session_state.sort_by == 'amount':
+                        # Toggle order
+                        st.session_state.sort_order = 'desc' if st.session_state.sort_order == 'asc' else 'asc'
+                    else:
+                        # Set new sort
+                        st.session_state.sort_by = 'amount'
+                        st.session_state.sort_order = 'asc'
+                    st.rerun()
+            
+            with sort_col3:
+                # ID sort button
+                if st.session_state.sort_by == 'id':
+                    arrow = '↓' if st.session_state.sort_order == 'asc' else '↑'
+                    button_label = f"🔢 ID {arrow}"
+                else:
+                    button_label = "🔢 ID"
+                
+                if st.button(button_label, key="sort_id_btn"):
+                    if st.session_state.sort_by == 'id':
+                        # Toggle order
+                        st.session_state.sort_order = 'desc' if st.session_state.sort_order == 'asc' else 'asc'
+                    else:
+                        # Set new sort
+                        st.session_state.sort_by = 'id'
+                        st.session_state.sort_order = 'asc'
+                    st.rerun()
+            
+            with sort_col4:
+                # Clear sort button
+                if st.session_state.sort_by:
+                    if st.button("❌ Limpiar orden", key="clear_sort_btn"):
+                        st.session_state.sort_by = None
+                        st.session_state.sort_order = 'asc'
+                        st.rerun()
+            
+            st.divider()
+            
             # Navigation buttons
             nav_col1, nav_col2, nav_col3, nav_col4 = st.columns(4)
             with nav_col1:
@@ -179,9 +277,9 @@ def page_receipts():
             # Display current details
             st.write(f"**File:** {Path(current_receipt.file_path).name if current_receipt.file_path else 'N/A'}")
             st.write(f"**Type:** {current_receipt.receipt_type or 'Unknown'}")
-            st.write(f"**Date:** {current_receipt.date.strftime('%Y-%m-%d') if current_receipt.date else 'N/A'}")
+            st.write(f"**Date:** {current_receipt.date.strftime('%d-%m-%Y') if current_receipt.date else 'N/A'}")
             st.write(f"**Amount:** €{current_receipt.amount:.2f}" if current_receipt.amount else "**Amount:** N/A")
-            st.write(f"**Processed:** {current_receipt.created_at.strftime('%Y-%m-%d %H:%M') if current_receipt.created_at else 'N/A'}")
+            st.write(f"**Processed:** {current_receipt.created_at.strftime('%d-%m-%Y %H:%M') if current_receipt.created_at else 'N/A'}")
             
             # Extracted data in collapsible panel
             if current_receipt.extracted_data:
@@ -270,7 +368,7 @@ def page_receipts():
                 if match.transaction_id:
                     bank_txn = matching_service.bank_repo.get_by_id(match.transaction_id)
                     if bank_txn:
-                        st.write(f"**Bank Date:** {bank_txn.date.strftime('%Y-%m-%d')}")
+                        st.write(f"**Bank Date:** {bank_txn.date.strftime('%d-%m-%Y')}")
                         st.write(f"**Bank Amount:** €{bank_txn.amount:.2f}")
                         st.write(f"**Description:** {bank_txn.description or 'N/A'}")
                 
@@ -422,7 +520,7 @@ def page_bank_transactions():
         
         row = {
             'indice': index,
-            'Date': txn.date.strftime('%Y-%m-%d'),
+            'Date': txn.date.strftime('%d-%m-%Y'),
             'Amount': f"€{txn.amount:.2f}",
             'Description': txn.description or '',
             'Reference': txn.reference or '',
@@ -651,7 +749,7 @@ def page_bank_transactions():
 
         st.write(f"File: {Path(current_unmatched.file_path).name if current_unmatched.file_path else 'N/A'}")
         st.write(f"Type: {current_unmatched.receipt_type or 'Unknown'}")
-        st.write(f"Date: {current_unmatched.date.strftime('%Y-%m-%d') if current_unmatched.date else 'N/A'}")
+        st.write(f"Date: {current_unmatched.date.strftime('%d-%m-%Y') if current_unmatched.date else 'N/A'}")
         st.write(f"Amount: €{current_unmatched.amount:.2f}" if current_unmatched.amount else "Amount: N/A")
         desc = current_unmatched.description or (current_unmatched.extracted_data.get('empresa') if current_unmatched.extracted_data else '') or ''
         if desc:
@@ -668,7 +766,7 @@ def page_bank_transactions():
             option = st.selectbox(
                 "Attach to bank transaction",
                 options=[None] + unmatched_transactions,
-                format_func=lambda t: "Select a transaction" if t is None else f"ID {t.id} | {t.date.strftime('%Y-%m-%d')} | €{t.amount:.2f} | {t.description or ''}",
+                format_func=lambda t: "Select a transaction" if t is None else f"ID {t.id} | {t.date.strftime('%d-%m-%Y')} | €{t.amount:.2f} | {t.description or ''}",
                 key=f"attach_txn_{current_unmatched.id}"
             )
             if st.button("🔗 Attach Receipt", key=f"attach_btn_{current_unmatched.id}", disabled=option is None):
@@ -961,6 +1059,38 @@ def page_export():
                         )
             except Exception as e:
                 st.error(f"❌ Export failed: {e}")
+    
+    st.divider()
+    
+    # Export all transactions complete
+    st.subheader("📊 Export All Transactions (Complete)")
+    st.write("Export all bank transactions with complete information including matched receipt details.")
+    st.caption("Fields: id, Date/Fecha, Tipo, Expense, GL Account, Description/Descripcion, Amount/Importe, Local currency/Moneda local, Comments/Notas, Img. Filename/Nombre imagen")
+    
+    complete_format = st.radio("Format", ['Excel', 'CSV'], key='complete_format')
+    
+    if st.button("📥 Export All Transactions Complete"):
+        with st.spinner("Exporting all transactions..."):
+            try:
+                file_path = export_service.export_all_transactions_complete(
+                    format=complete_format.lower()
+                )
+                st.success(f"✅ All transactions exported!")
+                st.info(f"📁 File location: `{file_path}`")
+                
+                # Provide download button
+                if Path(file_path).exists():
+                    with open(file_path, 'rb') as f:
+                        mime_type = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' if complete_format == 'Excel' else 'text/csv'
+                        st.download_button(
+                            label="⬇️ Download Complete Transactions File",
+                            data=f.read(),
+                            file_name=Path(file_path).name,
+                            mime=mime_type,
+                            key='download_complete'
+                        )
+            except Exception as e:
+                st.error(f"❌ Export failed: {e}")
 
 
 def get_database_stats():
@@ -1026,7 +1156,7 @@ def get_last_backup_info():
             mtime = datetime.fromtimestamp(last_backup.stat().st_mtime)
             return {
                 'path': str(last_backup),
-                'time': mtime.strftime('%Y-%m-%d %H:%M:%S'),
+                'time': mtime.strftime('%d-%m-%Y %H:%M:%S'),
                 'size_mb': last_backup.stat().st_size / (1024 * 1024)
             }
     except Exception as e:
@@ -1096,11 +1226,8 @@ def page_settings():
                 help="Directory containing images to process"
             )
             
-            output_dir = st.text_input(
-                "Output Directory",
-                value=config.paths.get('output_dir', './result'),
-                help="Directory for processed results"
-            )
+            # Note: output_dir is now determined dynamically by worker/period (./workers/{worker}/{period}/result)
+            st.info("ℹ️ Output Directory is now automatically determined by the active worker and period: `./workers/{worker}/{period}/result`")
             
             exports_dir = st.text_input(
                 "Exports Directory",
@@ -1113,7 +1240,7 @@ def page_settings():
             if submit_paths:
                 config.set('paths.bank_excel', bank_excel)
                 config.set('paths.input_dir', input_dir)
-                config.set('paths.output_dir', output_dir)
+                # output_dir is no longer configurable
                 config.set('paths.exports_dir', exports_dir)
                 config.save()
                 st.success("✅ Paths configuration saved!")

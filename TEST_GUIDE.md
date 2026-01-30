@@ -1,304 +1,289 @@
-# Receipt Processing Test Guide
+# Test Suite Guide
 
 ## Overview
 
-A comprehensive test suite for validating the receipt processing pipeline using Vision Language Model (VLM) OCR.
+El sistema incluye una suite completa de tests automatizados usando **pytest** con cobertura de código.
 
-## Files Created
+## 📁 Estructura de Tests
 
 ```
-test/
-├── receipt_test_examples/        # Directory for test images
-│   └── README.txt               # Instructions for adding test images
-└── README.md                    # Test documentation
+tests/
+├── conftest.py                    # Fixtures y configuración pytest
+├── unit/                          # Tests unitarios (rápidos, aislados)
+│   ├── test_bank_matching_service.py
+│   ├── test_conflict_resolution.py
+│   ├── test_export_service.py
+│   ├── test_queue_service.py
+│   ├── test_receipt_service.py
+│   └── test_statistics_service.py
+├── integration/                   # Tests de integración
+│   └── test_repositories.py
+└── test_amount_normalization.py   # Tests funcionales
 
-test_receipt_processing.py        # Main test script
-run_tests.bat                     # Windows batch runner
+old/                               # Scripts de test legacy/manual
+├── test_receipt_processing.py     # Test manual E2E con OCR real
+├── test_transaction_id_preservation.py
+├── test_csv_reload_ids.py
+└── test_excel_row_numbers.py
+
+pytest.ini                         # Configuración pytest
+run_tests.bat                      # Ejecutor principal de tests
 ```
 
-## Quick Start
+## 🚀 Ejecución de Tests
 
-### 1. Add Test Images
+### Opción 1: Usando el script (Recomendado)
 
-Copy receipt images to `test/receipt_test_examples/`:
-
-```bash
-# Example
-copy your_receipts\*.jpg test\receipt_test_examples\
-```
-
-### 2. Run Tests
-
-**Option A - Using Batch Script (Recommended for Windows):**
 ```batch
-run_tests.bat
+.\run_tests.bat
 ```
 
-**Option B - Direct Python:**
+Este script:
+- ✅ Activa el entorno virtual
+- ✅ Verifica dependencias
+- ✅ Ejecuta toda la suite pytest
+- ✅ Genera reporte de cobertura en `htmlcov/`
+
+### Opción 2: Pytest directo
+
 ```bash
-python test_receipt_processing.py
+# Todos los tests
+pytest
+
+# Solo tests unitarios
+pytest tests/unit/
+
+# Solo tests de integración
+pytest tests/integration/
+
+# Con verbose y sin cobertura
+pytest -v --no-cov
+
+# Un archivo específico
+pytest tests/unit/test_bank_matching_service.py
+
+# Un test específico
+pytest tests/unit/test_bank_matching_service.py::test_exact_match
 ```
 
-**Option C - Custom Directory:**
+### Opción 3: Tests manuales/legacy
+
+Estos scripts están en `old/` y son útiles para validaciones específicas:
+
 ```bash
-python test_receipt_processing.py --test-dir ./my_custom_test_images
+# Test manual E2E con OCR real (requiere imágenes)
+python old/test_receipt_processing.py
+
+# Validación de IDs de transacciones
+python old/test_transaction_id_preservation.py
+python old/test_csv_reload_ids.py
+python old/test_excel_row_numbers.py
 ```
 
-## What the Test Script Does
+## 📊 Cobertura de Tests
 
-### Phase 1: Environment Setup
-- ✅ Verifies test directory exists
-- ✅ Lists all test images found
-- ✅ Shows file sizes and counts
+La suite pytest incluye tests para:
 
-### Phase 2: Queue Preparation
-- ✅ Clears existing queue items
-- ✅ Enqueues test images for processing
+### ✅ Servicios (Unit Tests)
+- **BankMatchingService**: Matching de recibos con transacciones
+  - Match exacto por fecha y monto
+  - Match parcial (solo fecha o solo monto)
+  - Detección de conflictos
+  - Resolución de conflictos
+  
+- **ReceiptService**: Gestión de recibos
+  - Creación y actualización
+  - Marcado como ignorados
+  - Filtros y búsquedas
+  
+- **QueueService**: Cola de procesamiento
+  - Encolado de items
+  - Actualización de estados
+  - Estadísticas
+  
+- **StatisticsService**: Métricas y estadísticas
+  - Conteos por tipo
+  - Tasas de éxito
+  - Distribuciones
+  
+- **ExportService**: Exportación de datos
+  - Exportación a Excel/CSV
+  - Múltiples formatos
 
-### Phase 3: Processing
-- ✅ Loads VLM model
-- ✅ Processes each image sequentially
-- ✅ Logs detailed progress for each item
-- ✅ Captures timing metrics
-- ✅ Handles errors gracefully
+### ✅ Repositorios (Integration Tests)
+- CRUD operations
+- Consultas complejas
+- Integridad de datos
 
-### Phase 4: Results Summary
-- ✅ Queue statistics (completed, failed, pending)
-- ✅ Receipt statistics (total, by type)
-- ✅ Detailed per-image results
-- ✅ Success rate calculation
+### ✅ Funcionalidad
+- Normalización de importes
+- Manejo de conflictos
+- Comportamiento con items ignorados
 
-## Sample Test Output
+## 📈 Reporte de Cobertura
 
-```
-╔══════════════════════════════════════════════════════════════════════════════╗
-║                    RECEIPT PROCESSING TEST SUITE                            ║
-╚══════════════════════════════════════════════════════════════════════════════╝
+Después de ejecutar los tests, se genera un reporte HTML:
 
-Test Directory: C:\WORKSPACE\gguf\test\receipt_test_examples
-Start Time: 2026-01-25 14:30:00
-
-================================================================================
-SETTING UP TEST ENVIRONMENT
-================================================================================
-✓ Found 3 test images
-  - taxi_receipt.jpg (245.3 KB)
-  - hotel_invoice.jpg (189.7 KB)
-  - restaurant_bill.jpg (156.2 KB)
-
-Clearing existing queue items...
-  ✓ Queue is empty
-
-================================================================================
-ENQUEUEING TEST IMAGES
-================================================================================
-✓ Enqueued 3 images for processing
-
-================================================================================
-STARTING RECEIPT PROCESSING
-================================================================================
-Processing 3 pending items...
-VLM Model: models/Qwen_Qwen2.5-VL-7B-Instruct-Q4_K_M.gguf
-Max Tokens: 512
-Temperature: 0.1
-
---------------------------------------------------------------------------------
-📸 PROCESSING ITEM 1/3
-   File: taxi_receipt.jpg
-   Queue ID: 1
---------------------------------------------------------------------------------
-Loading VLM model (first time)...
-✅ SUCCESS - Completed in 142.3s
-   📊 Receipt Details:
-      Type: Taxis
-      Date: 2026-01-15
-      Amount: 25.50
-      File: result/260115_2550_Taxis.jpg
-
---------------------------------------------------------------------------------
-📸 PROCESSING ITEM 2/3
-   File: hotel_invoice.jpg
-   Queue ID: 2
---------------------------------------------------------------------------------
-✅ SUCCESS - Completed in 156.7s
-   📊 Receipt Details:
-      Type: Hoteles
-      Date: 2026-01-14
-      Amount: 89.00
-      File: result/260114_8900_Hoteles.jpg
-
---------------------------------------------------------------------------------
-📸 PROCESSING ITEM 3/3
-   File: restaurant_bill.jpg
-   Queue ID: 3
---------------------------------------------------------------------------------
-❌ FAILED - Failed to extract JSON from response
-   Duration: 158.2s
-
-================================================================================
-PROCESSING COMPLETE
-================================================================================
-Total time: 457.2s
-Processed: 3 items
-Average: 152.4s per item
-
-================================================================================
-TEST SUMMARY
-================================================================================
-
-📊 Queue Statistics:
-   Completed: 2
-   Failed: 1
-   Pending: 0
-
-📄 Receipt Statistics:
-   Total Receipts: 2
-   By Type:
-      - Hoteles: 1
-      - Taxis: 1
-
-📋 Detailed Results:
-   1. ✅ taxi_receipt.jpg
-      Duration: 142.3s
-      Type: Taxis
-      Amount: 25.50
-   2. ✅ hotel_invoice.jpg
-      Duration: 156.7s
-      Type: Hoteles
-      Amount: 89.00
-   3. ❌ restaurant_bill.jpg
-      Duration: 158.2s
-      Error: Failed to extract JSON from response
-
-✨ Success Rate: 66.7% (2/3)
-
-================================================================================
-TEST COMPLETE
-================================================================================
-```
-
-## Understanding Results
-
-### Success Indicators
-- ✅ **Green checkmark** - Receipt processed successfully
-- **Duration** - Time taken to process the image
-- **Receipt Details** - Extracted type, date, and amount
-- **Output File** - Location of processed receipt
-
-### Failure Indicators
-- ❌ **Red X** - Processing failed
-- **Error message** - Reason for failure
-- Common errors:
-  - `Failed to extract JSON from response` - Model couldn't parse the image
-  - `File not found` - Image path invalid
-  - `VLM returned empty response` - Model confused by image
-
-### Success Rate
-- **Target**: >90% for good quality images
-- **Acceptable**: >80% for mixed quality images
-- **Needs Attention**: <70% success rate
-
-## Interpreting Logs
-
-### Complete Logs
-Check `logs/receipt_test.log` for:
-- Full VLM responses
-- Detailed extraction attempts
-- Resource usage metrics
-- Error stack traces
-
-### Key Log Sections
-1. **Model loading** - VLM initialization time
-2. **Image processing** - Per-image detailed steps
-3. **Data extraction** - JSON parsing attempts
-4. **Error details** - Stack traces for failures
-
-## Troubleshooting
-
-### No Images Found
-```
-⚠️ No images found in test/receipt_test_examples
-```
-**Solution**: Add `.jpg`, `.jpeg`, or `.png` images to the test directory
-
-### VLM Model Not Found
-```
-ERROR: Model file not found
-```
-**Solution**: Verify `config.yaml` has correct model path
-
-### Processing Takes Too Long
-Each image takes 2-3 minutes with current settings.
-**Solutions**:
-- Use fewer test images initially
-- Enable "Turbo Mode" for faster processing
-- Check CPU/RAM usage isn't maxed out
-
-### High Failure Rate
-If >30% of images fail:
-1. Check image quality (resolution, contrast)
-2. Verify images aren't corrupted
-3. Review VLM model configuration
-4. Check log files for common error patterns
-
-## Best Practices
-
-### Test Image Selection
-1. **Start small**: Test with 2-3 images first
-2. **Vary types**: Include different receipt types
-3. **Quality mix**: Include both clear and challenging images
-4. **Known data**: Use receipts where you know the correct values
-
-### Running Tests
-1. **Single run**: For quick validation
-2. **Batch run**: For comprehensive testing
-3. **Monitor logs**: Watch for patterns in failures
-4. **Compare results**: Validate extracted data accuracy
-
-### After Testing
-1. Review success/failure patterns
-2. Investigate failed images
-3. Adjust VLM parameters if needed
-4. Re-test problematic images
-
-## Advanced Usage
-
-### Custom Test Directory
 ```bash
-python test_receipt_processing.py --test-dir ./production_samples
+# Ver el reporte de cobertura
+start htmlcov\index.html  # Windows
+open htmlcov/index.html   # Mac
+xdg-open htmlcov/index.html  # Linux
 ```
 
-### Automated Testing
-Integrate into CI/CD pipeline:
+El reporte muestra:
+- 📊 Porcentaje de cobertura por módulo
+- 🔍 Líneas cubiertas/no cubiertas
+- 📝 Funciones testeadas
+- ⚠️ Código sin tests
+
+## 🎯 Mejores Prácticas
+
+### Escribir nuevos tests
+
+```python
+import pytest
+from src.services.my_service import MyService
+
+class TestMyService:
+    """Tests para MyService."""
+    
+    def test_something(self, test_config):
+        """Test description."""
+        service = MyService(test_config)
+        result = service.do_something()
+        assert result == expected
+```
+
+### Usar fixtures
+
+Los fixtures comunes están en `tests/conftest.py`:
+- `test_db`: Base de datos temporal
+- `test_config`: Configuración de test
+- `temp_dir`: Directorio temporal
+
+### Marcar tests
+
+```python
+@pytest.mark.unit
+def test_unit():
+    pass
+
+@pytest.mark.integration
+def test_integration():
+    pass
+
+@pytest.mark.slow
+def test_slow_operation():
+    pass
+```
+
+## 🔧 Troubleshooting
+
+### "ModuleNotFoundError"
 ```bash
-# Run tests and capture exit code
-python test_receipt_processing.py
-if [ $? -eq 0 ]; then
-    echo "Tests passed"
-else
-    echo "Tests failed"
-    exit 1
-fi
+# Asegúrate de estar en el entorno virtual
+.venv\Scripts\activate
 ```
 
-### Performance Benchmarking
-Track processing times over multiple runs to:
-- Identify performance regressions
-- Optimize VLM parameters
-- Monitor resource usage trends
+### "No module named pytest"
+```bash
+pip install pytest pytest-cov
+```
 
-## Support
+### Tests fallan por base de datos
+```bash
+# Los tests usan bases de datos temporales
+# Si hay problemas, verifica que test_db fixture funcione
+pytest tests/conftest.py -v
+```
 
-For issues or questions:
-1. Check `logs/receipt_test.log` for detailed errors
-2. Review test summary output
-3. Verify configuration in `config.yaml`
-4. Test with known-good images first
+### Ver más detalles
+```bash
+# Más verbose
+pytest -vv
+
+# Mostrar print statements
+pytest -s
+
+# Modo debug
+pytest --pdb
+```
+
+## 📝 Tests Legacy/Manual
+
+Los scripts en `old/` son útiles para casos específicos:
+
+### test_receipt_processing.py
+Test manual END-TO-END que:
+- Carga el modelo VLM real
+- Procesa imágenes de `tests/receipt_test_examples/`
+- Genera logs detallados
+- Útil para demos y debugging
+
+**Cuándo usar**: Validar pipeline completo con OCR real
+
+**Requisitos**: 
+- Imágenes de recibos en `tests/receipt_test_examples/`
+- Modelo VLM descargado en `models/`
+
+### test_transaction_id_preservation.py
+Valida que IDs de transacciones se preserven correctamente.
+
+**Cuándo usar**: Validar comportamiento de IDs tras cambios en CSV loading
+
+### test_csv_reload_ids.py
+Valida múltiples cargas de CSV.
+
+**Cuándo usar**: Verificar que IDs se reasignen correctamente
+
+### test_excel_row_numbers.py
+Simula carga de Excel con skiprows=13.
+
+**Cuándo usar**: Validar casos específicos de formato Excel
 
 ---
 
-**Ready to test?**
+## 📋 Ejemplo: Salida de pytest
 
-1. Add images to `test/receipt_test_examples/`
-2. Run `run_tests.bat`
-3. Review results and logs
+```
+================== test session starts ==================
+platform win32 -- Python 3.11.0, pytest-7.4.3
+collected 45 items
+
+tests/unit/test_bank_matching_service.py ........  [ 17%]
+tests/unit/test_conflict_resolution.py ....      [ 26%]
+tests/unit/test_export_service.py .....          [ 37%]
+tests/unit/test_queue_service.py ......          [ 50%]
+tests/unit/test_receipt_service.py ......        [ 63%]
+tests/unit/test_statistics_service.py .......    [ 78%]
+tests/integration/test_repositories.py .....     [ 89%]
+tests/test_amount_normalization.py .....         [100%]
+
+---------- coverage: platform win32 ----------
+Name                                    Stmts   Miss  Cover
+-----------------------------------------------------------
+src/core/config.py                         45      2    96%
+src/core/database.py                       38      1    97%
+src/models/domain.py                       65      0   100%
+src/repositories/bank_repository.py        89      3    97%
+src/repositories/receipt_repository.py     95      4    96%
+src/services/bank_matching_service.py     156      8    95%
+src/services/export_service.py             78      5    94%
+src/services/queue_service.py              67      2    97%
+src/services/receipt_service.py            84      6    93%
+src/services/statistics_service.py        112      7    94%
+-----------------------------------------------------------
+TOTAL                                     829     38    95%
+
+Coverage HTML written to htmlcov/index.html
+
+=============== 45 passed in 12.34s ================
+```
+
+## 🎓 Recursos
+
+- [Pytest Documentation](https://docs.pytest.org/)
+- [Pytest-cov Plugin](https://pytest-cov.readthedocs.io/)
+- Coverage Report: `htmlcov/index.html` (después de ejecutar tests)
+- Project README: [README.md](README.md)

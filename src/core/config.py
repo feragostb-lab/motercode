@@ -111,7 +111,7 @@ class Config:
             },
             'paths': {
                 'input_dir': './img',
-                'output_dir': './result',
+                # output_dir is now determined by worker/period (./workers/{worker}/{period}/result)
                 'database': './receipts.db',
                 'logs_dir': './logs',
                 'temp_dir': './temp',

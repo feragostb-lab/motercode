@@ -65,7 +65,7 @@ class ExportService:
             
             row = {
                 'Receipt ID': receipt.id,
-                'Receipt Date': receipt.date.strftime('%Y-%m-%d') if receipt.date else '',
+                'Receipt Date': receipt.date.strftime('%d-%m-%Y') if receipt.date else '',
                 'Receipt Amount': float(receipt.amount) if receipt.amount else 0.0,
                 'Receipt Type': receipt.receipt_type or '',
                 'Receipt Description': receipt.description or '',
@@ -75,7 +75,7 @@ class ExportService:
                 'Match Confidence': float(match.confidence) if match else 0.0,
                 'Is Conflict': match.is_conflict if match else False,
                 'Conflict Accepted': match.conflict_accepted if match else False,
-                'Bank Date': bank_trans.date.strftime('%Y-%m-%d') if bank_trans and bank_trans.date else '',
+                'Bank Date': bank_trans.date.strftime('%d-%m-%Y') if bank_trans and bank_trans.date else '',
                 'Bank Amount': float(bank_trans.amount) if bank_trans and bank_trans.amount else 0.0,
                 'Bank Description': bank_trans.description if bank_trans else '',
                 'Bank Reference': bank_trans.reference if bank_trans else '',
@@ -117,7 +117,7 @@ class ExportService:
             
             row = {
                 'Receipt ID': receipt.id,
-                'Receipt Date': receipt.date.strftime('%Y-%m-%d') if receipt.date else '',
+                'Receipt Date': receipt.date.strftime('%d-%m-%Y') if receipt.date else '',
                 'Receipt Amount': float(receipt.amount) if receipt.amount else 0.0,
                 'Receipt Type': receipt.receipt_type or '',
                 'Receipt Description': receipt.description or '',
@@ -126,7 +126,7 @@ class ExportService:
                 'Match Type': match.match_type.value if match else 'none',
                 'Match Confidence': float(match.confidence) if match else 0.0,
                 'Is Conflict': match.is_conflict if match else False,
-                'Bank Date': bank_trans.date.strftime('%Y-%m-%d') if bank_trans and bank_trans.date else '',
+                'Bank Date': bank_trans.date.strftime('%d-%m-%Y') if bank_trans and bank_trans.date else '',
                 'Bank Amount': float(bank_trans.amount) if bank_trans and bank_trans.amount else 0.0,
                 'Bank Description': bank_trans.description if bank_trans else '',
             }
@@ -165,6 +165,94 @@ class ExportService:
             df.to_csv(output_path, index=False, encoding='utf-8')
         
         logger.info(f"Exported unmatched transactions to {output_path}")
+        return str(output_path)
+    
+    def export_all_transactions_complete(self, format: str = 'excel') -> str:
+        """
+        Export all bank transactions with matched receipt information.
+        Campos: id, Date/Fecha, Tipo, Expense, GL Account, Description/Descripcion, 
+                Amount (local currency)/Importe (moneda local), Local currency/Moneda local,
+                Comments/Notas, Img. Filename/Nombre imagen
+        
+        Args:
+            format: 'excel' or 'csv'
+            
+        Returns:
+            Path to exported file
+        """
+        from ..services.config_service import ConfigService
+        
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        ext = 'xlsx' if format == 'excel' else 'csv'
+        filename = f"all_transactions_complete_{timestamp}.{ext}"
+        output_path = self.export_dir / filename
+        
+        # Get type definitions to retrieve normalized_type and gl_account
+        config_service = ConfigService()
+        type_definitions = config_service.get_type_definitions()
+        
+        # Create a map of receipt_type -> (normalized_type, gl_account)
+        type_map = {}
+        for type_def in type_definitions:
+            type_map[type_def.name] = {
+                'normalized_type': type_def.normalized_type,
+                'gl_account': type_def.gl_account
+            }
+        
+        # Get all bank transactions
+        transactions = self.bank_repo.get_all()
+        
+        export_data = []
+        for idx, trans in enumerate(transactions, start=1):
+            # Get matched receipt if exists
+            matches = self.match_repo.get_by_transaction_id(trans.id)
+            receipt = None
+            if matches:  # matches is a list
+                # Get the first match (or the accepted one if there are conflicts)
+                match = matches[0] if len(matches) == 1 else next((m for m in matches if m.conflict_accepted), matches[0])
+                receipt = self.receipt_repo.get_by_id(match.receipt_id)
+            
+            # Extract filename from receipt file_path
+            img_filename = ""
+            tipo = ""
+            expense = ""
+            gl_account = ""
+            
+            if receipt:
+                if receipt.file_path:
+                    img_filename = Path(receipt.file_path).name
+                
+                # Get normalized type and GL account from type definition
+                receipt_type = receipt.receipt_type or ''
+                tipo = receipt_type  # Tipo en castellano (original)
+                
+                if receipt_type in type_map:
+                    expense = type_map[receipt_type]['normalized_type'] or ''
+                    gl_account = type_map[receipt_type]['gl_account'] or ''
+            
+            row = {
+                'id': idx,  # Número de orden
+                'Date / Fecha': trans.date.strftime('%d-%m-%Y') if trans.date else '',
+                'Tipo': tipo,  # Tipo en castellano
+                'Expense': expense,  # Normalized type
+                'GL Account': gl_account,
+                'Description / Descripcion': receipt.description if receipt else '',
+                'Amount (local currency) / Importe (moneda local)': float(trans.amount) if trans.amount else 0.0,
+                'Local currency / Moneda local': 'EUR',  # Asumiendo EUR como moneda local
+                'Comments / Notas': trans.description or '',  # DESCRIPCIÓN del CSV bancario
+                'Img. Filename / Nombre imagen': img_filename,
+            }
+            export_data.append(row)
+        
+        # Create DataFrame and export
+        df = pd.DataFrame(export_data)
+        
+        if format == 'excel':
+            df.to_excel(output_path, index=False)
+        else:
+            df.to_csv(output_path, index=False, encoding='utf-8')
+        
+        logger.info(f"Exported {len(export_data)} complete transactions to {output_path}")
         return str(output_path)
     
     # ===== ROC SKINCARE: Multi-worker period export =====

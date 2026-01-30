@@ -23,16 +23,20 @@ La aplicación estará disponible en `http://localhost:8501`
 ```
 gguf/
 ├── app.py                      # ✨ PUNTO DE ENTRADA PRINCIPAL - Aplicación unificada
-├── app_processor.py            # (Deprecado - usar app.py)
-├── app_dashboard.py            # (Deprecado - usar app.py)
-├── app_rocskincare.py          # (Deprecado - usar app.py)
-├── pages/                      # Módulos de páginas de la aplicación
+├── app_processor.py            # Módulo OCR Processor (independiente, también importado)
+├── app_dashboard.py            # Módulo Dashboard (independiente, también importado)
+├── app_rocskincare.py          # Módulo ROC Skincare (independiente, también importado)
+├── modules/                    # Páginas modulares para la app unificada
 │   ├── processor_page.py       # Página del procesador OCR
+│   ├── failed_items_page.py    # Página de items fallidos
 │   ├── dashboard_*.py          # Páginas del dashboard
-│   └── rocskincare_*.py        # Páginas de ROC Skincare
+│   ├── rocskincare_*.py        # Páginas de ROC Skincare
+│   ├── admin_page.py           # Panel de administración
+│   └── admin_test_receipt.py   # Página de test de recibos
 ├── src/                        # Código fuente principal
 │   ├── core/                   # Componentes centrales
 │   ├── models/                 # Modelos de datos
+│   ├── ocr_processor.py        # Procesador OCR principal
 │   ├── repositories/           # Capa de acceso a datos
 │   ├── services/               # Lógica de negocio
 │   └── utils/                  # Utilidades
@@ -47,7 +51,11 @@ En la barra lateral izquierda, selecciona el módulo que deseas usar:
 
 #### 1. 🖼️ OCR Processor
 
-**Panel de Control:**
+**Páginas disponibles:**
+- **🖼️ Procesador**: Procesamiento principal de recibos
+- **❌ Items Fallidos**: Revisión de items que fallaron en el procesamiento
+
+**Panel de Control (Procesador):**
 - **Start/Pause/Stop**: Controla el procesamiento de imágenes
 - **Toggle Mode**: Cambia entre modo Normal (70%) y Turbo (95%)
 - **Scan & Enqueue**: Escanea el directorio de entrada y añade imágenes a la cola
@@ -110,6 +118,11 @@ En la barra lateral izquierda, selecciona el módulo que deseas usar:
 - Ver estadísticas por periodo
 - Control de estado (ACTIVE/CLOSED)
 
+**�️ Cargar Imágenes**
+- Subir imágenes de recibos al periodo activo
+- Procesar imágenes directamente desde la interfaz
+- Gestión de archivos por trabajador y periodo
+
 **📤 Cargar CSV**
 - Subir transacciones bancarias del periodo activo
 - Soporte para múltiples cargas (se reemplazan)
@@ -126,6 +139,20 @@ En la barra lateral izquierda, selecciona el módulo que deseas usar:
 - Tablas de recibos por periodo
 - Detalle de matches y conflictos
 - Exportación de datos del periodo
+
+#### 4. ⚙️ Administración
+
+**Páginas disponibles:**
+
+**⚙️ Administración**
+- Panel de control administrativo del sistema
+- Gestión de configuración
+- Herramientas de mantenimiento
+
+**🧪 Test Receipt**
+- Probar procesamiento de recibos individuales
+- Validación de OCR y extracción de datos
+- Debug y resolución de problemas
 
 ## ⚙️ Configuración
 
@@ -196,7 +223,7 @@ pip install -r requirements.txt
 Coloca los modelos GGUF en la carpeta `./models/`:
 - `Qwen_Qwen2.5-VL-7B-Instruct-Q4_K_M.gguf`
 - `mmproj-Qwen2.5-VL-7B-Instruct-f16.gguf`
-
+> 💡 **Nota**: Los modelos GGUF deben descargarse desde Hugging Face u otra fuente compatible.
 5. **Configurar el sistema**
 ```bash
 python scripts/setup_config.py
@@ -277,10 +304,11 @@ El sistema utiliza SQLite con las siguientes tablas principales:
 
 ## 📚 Documentación Adicional
 
-- `IMPLEMENTATION_GUIDE.md` - Guía de implementación detallada
-- `README_ROCSKINCARE.md` - Documentación específica de ROC Skincare
-- `README_DASHBOARD.md` - Guía del dashboard original
-- `ROCSkincare_Implementation.md` - Detalles de implementación multi-trabajador
+- [DEVELOPER_GUIDE.md](DEVELOPER_GUIDE.md) - Guía técnica para desarrolladores
+- [doc/IMPLEMENTATION_GUIDE.md](doc/IMPLEMENTATION_GUIDE.md) - Detalles de implementación
+- [doc/README_ROCSKINCARE.md](doc/README_ROCSKINCARE.md) - Documentación específica de ROC Skincare
+- [doc/README_DASHBOARD.md](doc/README_DASHBOARD.md) - Guía del dashboard
+- [doc/ROCSkincare_Implementation.md](doc/ROCSkincare_Implementation.md) - Detalles de implementación multi-trabajador
 
 ## 🔄 Migración desde Versiones Anteriores
 
@@ -301,6 +329,9 @@ Los datos existentes en la base de datos son completamente compatibles.
 - 🎨 Navegación mejorada entre módulos
 - 📦 Arquitectura modular con páginas separadas
 - 🔧 Sesión compartida entre componentes
+- ⚙️ Panel de administración y herramientas de testing
+- 🖼️ Página de carga de imágenes para ROC Skincare
+- ❌ Gestión de items fallidos en procesamiento
 - 📚 Documentación actualizada
 
 ### v1.0 - Versiones Separadas

@@ -29,7 +29,7 @@ class ReceiptService:
         self.config = config
         self.db = get_database(config.paths.get('database', './receipts.db'))
         self.repository = ReceiptRepository(self.db)
-        self.output_dir = Path(config.paths.get('output_dir', './result'))
+        # output_dir is now determined dynamically based on active worker/period
         self.config_service = ConfigService()
         
         # Cached scoring rules (invalidated on config reload)

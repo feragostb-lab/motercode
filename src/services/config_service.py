@@ -412,7 +412,9 @@ class ConfigService:
                     enabled=type_data.get('enabled', True),
                     direct_indicator=type_data.get('direct_indicator', {}),
                     auxiliary_fields=type_data.get('auxiliary_fields', {}),
-                    keyword_weights=type_data.get('keyword_weights', {})
+                    keyword_weights=type_data.get('keyword_weights', {}),
+                    normalized_type=type_data.get('normalized_type', ''),
+                    gl_account=type_data.get('gl_account', '')
                 )
                 type_definitions.append(type_def)
             except Exception as e:

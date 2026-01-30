@@ -309,6 +309,8 @@ class ReceiptTypeDefinition:
     direct_indicator: Dict[str, Any]  # {field_key, question, weight}
     auxiliary_fields: Dict[str, Dict[str, Any]]  # {field_key: {question, weight, type, help}}
     keyword_weights: Dict[str, int]  # {keyword: weight}
+    normalized_type: str = ""  # Normalized type name
+    gl_account: str = ""  # GL Account number (xxxxxxxx format)
     
     def calculate_max_score(self) -> int:
         """Calculate maximum possible score for this type."""
@@ -333,6 +335,8 @@ class ReceiptTypeDefinition:
             'direct_indicator': self.direct_indicator,
             'auxiliary_fields': self.auxiliary_fields,
             'keyword_weights': self.keyword_weights,
+            'normalized_type': self.normalized_type,
+            'gl_account': self.gl_account,
             'max_score': self.calculate_max_score()
         }
 

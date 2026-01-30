@@ -246,7 +246,7 @@ def render():
                     st.write(f"{size_mb:.2f} MB")
                 with col3:
                     mtime = datetime.fromtimestamp(backup.stat().st_mtime)
-                    st.caption(mtime.strftime("%Y-%m-%d %H:%M"))
+                    st.caption(mtime.strftime("%d-%m-%Y %H:%M"))
             
             if len(backups) > 10:
                 st.caption(f"... y {len(backups) - 10} backups más antiguos")
@@ -432,6 +432,27 @@ def render_type_editor(type_def, idx, config_service):
             key=f"enabled_{idx}"
         )
     
+    # Additional fields: Normalized Type and GL Account
+    col_nt, col_gl = st.columns(2)
+    
+    with col_nt:
+        normalized_type = st.text_input(
+            "Normalized Type",
+            value=type_def.normalized_type,
+            max_chars=50,
+            key=f"normalized_type_{idx}",
+            help="Tipo normalizado para exportación"
+        )
+    
+    with col_gl:
+        gl_account = st.text_input(
+            "GL Account",
+            value=type_def.gl_account,
+            max_chars=20,
+            key=f"gl_account_{idx}",
+            help="Cuenta contable (formato: xxxxxxxx)"
+        )
+    
     st.write("**Indicador Directo** (Pregunta principal - peso recomendado: 8-15)")
     
     col_di1, col_di2, col_di3 = st.columns([2, 3, 1])
@@ -544,11 +565,46 @@ def render_type_editor(type_def, idx, config_service):
     
     st.caption("📝 Para modificar palabras clave, edita config.yaml")
     
-    # Delete type
+    # Save changes button
     st.divider()
     
-    if st.button(f"🗑️ Eliminar Tipo '{type_def.name}'", key=f"delete_{idx}", type="secondary"):
-        st.session_state[f'confirm_delete_{idx}'] = True
+    col_save, col_delete = st.columns([1, 1])
+    
+    with col_save:
+        if st.button(f"💾 Guardar Cambios", key=f"save_{idx}", type="primary"):
+            # Get all current type definitions
+            all_types = config_service.get_type_definitions()
+            
+            # Update this specific type with new values from form
+            for t in all_types:
+                if t.name == type_def.name:
+                    # Update basic fields
+                    t.name = new_name
+                    t.enabled = enabled
+                    t.normalized_type = normalized_type
+                    t.gl_account = gl_account
+                    
+                    # Update direct indicator
+                    t.direct_indicator = {
+                        'field_key': di_field,
+                        'question': di_question,
+                        'weight': di_weight
+                    }
+                    break
+            
+            # Convert to dict and save
+            type_defs_data = [t.to_dict() for t in all_types]
+            success, error = config_service.save_type_definitions(type_defs_data)
+            
+            if success:
+                st.success(f"✅ Cambios guardados para '{new_name}'")
+                st.rerun()
+            else:
+                st.error(f"❌ Error al guardar: {error}")
+    
+    with col_delete:
+        if st.button(f"🗑️ Eliminar Tipo", key=f"delete_{idx}", type="secondary"):
+            st.session_state[f'confirm_delete_{idx}'] = True
     
     if st.session_state.get(f'confirm_delete_{idx}', False):
         st.warning(f"⚠️ ¿Estás seguro de eliminar el tipo **{type_def.name}**?")

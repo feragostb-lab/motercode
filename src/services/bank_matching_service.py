@@ -41,6 +41,9 @@ class BankMatchingService:
                                      transactions: List[BankTransaction]) -> Match:
         """
         Find best match for a receipt among bank transactions.
+        Strategy:
+        1. First try to find exact amount matches (with dates)
+        2. Only if no exact match found, apply amount_tolerance
         
         Args:
             receipt: Receipt to match
@@ -61,42 +64,91 @@ class BankMatchingService:
         # Get unmatched transactions only
         unmatched_ids = {t.id for t in transactions if t.matched_receipt_id is None}
         
-        # Find all matches
-        matches = []
+        # STEP 1: Find exact amount matches first
+        exact_matches = []
         for trans in transactions:
-            # Skip if already matched (unless it's for checking conflicts)
+            # Skip if already matched
             if trans.id not in unmatched_ids:
                 continue
             
             date_match = self._dates_match(receipt.date, trans.date)
-            amount_match = self._amounts_match(receipt.amount, trans.amount)
+            amount_exact = self._amounts_exact(receipt.amount, trans.amount)
+            
+            # Only consider exact amount matches
+            if not amount_exact:
+                continue
             
             # Determine match type
-            if date_match and amount_match:
+            if date_match and amount_exact:
                 match_type = MatchType.BOTH
-            elif amount_match:
+            elif amount_exact:
+                match_type = MatchType.AMOUNT_ONLY
+            else:
+                continue
+            
+            exact_matches.append({
+                'transaction_id': trans.id,
+                'match_type': match_type,
+                'confidence': self._calculate_confidence(match_type),
+                'is_exact': True
+            })
+        
+        # If we found exact matches, use them
+        if exact_matches:
+            # Prioritize: both > amount only
+            exact_matches.sort(key=lambda x: (
+                x['match_type'] == MatchType.BOTH,
+                x['match_type'] == MatchType.AMOUNT_ONLY,
+                x['confidence']
+            ), reverse=True)
+            
+            best = exact_matches[0]
+            
+            return Match(
+                receipt_id=receipt.id,
+                transaction_id=best['transaction_id'],
+                match_type=best['match_type'],
+                confidence=best['confidence'],
+                is_conflict=False,
+            )
+        
+        # STEP 2: No exact match found, now apply tolerance
+        tolerance_matches = []
+        for trans in transactions:
+            # Skip if already matched
+            if trans.id not in unmatched_ids:
+                continue
+            
+            date_match = self._dates_match(receipt.date, trans.date)
+            amount_match_tolerance = self._amounts_match_with_tolerance(receipt.amount, trans.amount)
+            
+            # Determine match type
+            if date_match and amount_match_tolerance:
+                match_type = MatchType.BOTH
+            elif amount_match_tolerance:
                 match_type = MatchType.AMOUNT_ONLY
             elif date_match:
                 match_type = MatchType.DATE_ONLY
             else:
                 continue  # No match
             
-            matches.append({
+            tolerance_matches.append({
                 'transaction_id': trans.id,
                 'match_type': match_type,
-                'confidence': self._calculate_confidence(match_type)
+                'confidence': self._calculate_confidence(match_type),
+                'is_exact': False
             })
         
         # Prioritize: both > amount > date
-        if matches:
-            matches.sort(key=lambda x: (
+        if tolerance_matches:
+            tolerance_matches.sort(key=lambda x: (
                 x['match_type'] == MatchType.BOTH,
                 x['match_type'] == MatchType.AMOUNT_ONLY,
                 x['match_type'] == MatchType.DATE_ONLY,
                 x['confidence']
             ), reverse=True)
             
-            best = matches[0]
+            best = tolerance_matches[0]
             
             return Match(
                 receipt_id=receipt.id,
@@ -395,9 +447,26 @@ class BankMatchingService:
             diff = abs((date1.date() - date2.date()).days)
             return diff <= 1
     
-    def _amounts_match(self, amount1: Optional[Decimal], amount2: Optional[Decimal]) -> bool:
+    def _amounts_exact(self, amount1: Optional[Decimal], amount2: Optional[Decimal]) -> bool:
+        """
+        Check if two amounts are exactly equal.
+        
+        Args:
+            amount1: First amount
+            amount2: Second amount
+            
+        Returns:
+            True if amounts are exactly equal
+        """
+        if not amount1 or not amount2:
+            return False
+        
+        return amount1 == amount2
+    
+    def _amounts_match_with_tolerance(self, amount1: Optional[Decimal], amount2: Optional[Decimal]) -> bool:
         """
         Check if two amounts match within tolerance percentage.
+        This method should only be called when no exact match is found.
         
         Args:
             amount1: First amount
@@ -510,8 +579,11 @@ class BankMatchingService:
             pattern = '|'.join(summary_keywords)
             df = df[~df['fecha'].astype(str).str.upper().str.contains(pattern, na=False)].copy()
             
-            # Parse dates - try Spanish format first (dd/mm/yyyy), then other formats
-            df['fecha_procesada'] = pd.to_datetime(df['fecha'], format='%d/%m/%Y', errors='coerce')
+            # Parse dates - try Spanish format with hyphens first (dd-mm-yyyy), then slashes, then other formats
+            df['fecha_procesada'] = pd.to_datetime(df['fecha'], format='%d-%m-%Y', errors='coerce')
+            if df['fecha_procesada'].isna().all():
+                # Try slash separator
+                df['fecha_procesada'] = pd.to_datetime(df['fecha'], format='%d/%m/%Y', errors='coerce')
             if df['fecha_procesada'].isna().all():
                 # Try dot separator
                 df['fecha_procesada'] = pd.to_datetime(df['fecha'], format='%d.%m.%Y', errors='coerce')
