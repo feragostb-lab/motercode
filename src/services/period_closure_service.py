@@ -109,8 +109,8 @@ class PeriodClosureService:
         if not worker:
             raise ValueError("Trabajador no encontrado")
         
-        # TODO: Generate export Excel using ExportService
-        # export_path = self.export_service.export_period_data(period_id, export_type='closure')
+        # Generate export Excel using ExportService
+        export_path = self.export_period_data(period_id, export_type='closure')
         
         # Create ZIP with result/ images + CSV + Excel
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
@@ -131,9 +131,9 @@ class PeriodClosureService:
                     csv_path = Path(period.csv_file_path)
                     zipf.write(csv_path, arcname=f"csv/{csv_path.name}")
                 
-                # TODO: Add generated Excel export
-                # if Path(export_path).exists():
-                #     zipf.write(export_path, arcname=f"export/{Path(export_path).name}")
+                # Add generated Excel export
+                if Path(export_path).exists():
+                    zipf.write(export_path, arcname=f"export/{Path(export_path).name}")
             
             logger.info(f"Created closure ZIP: {zip_path}")
             
@@ -229,7 +229,7 @@ class PeriodClosureService:
     
     def export_period_data(self, period_id: int, export_type: str = 'temporal') -> str:
         """
-        Export period data to Excel.
+        Export period data to Excel usando export_service.
         
         Args:
             period_id: Period to export
@@ -238,6 +238,8 @@ class PeriodClosureService:
         Returns:
             Path to generated Excel file
         """
-        # TODO: Implement using ExportService
-        # This will be delegated to a modified ExportService that can filter by period
-        raise NotImplementedError("export_period_data will be implemented with ExportService modifications")
+        from ..services.export_service import ExportService
+        
+        # Usar ExportService que ahora tiene el formato correcto con openpyxl
+        export_service = ExportService(self.config)
+        return export_service.export_period_data(period_id, export_type=export_type)

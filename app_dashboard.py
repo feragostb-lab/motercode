@@ -18,6 +18,7 @@ from src.core.database import get_database
 from src.core.logging import setup_logging
 from src.core.backup_manager import BackupManager
 from src.models.domain import Match, MatchType
+from src.utils.formatters import formatear_monto
 import os
 from datetime import datetime
 
@@ -278,7 +279,7 @@ def page_receipts():
             st.write(f"**File:** {Path(current_receipt.file_path).name if current_receipt.file_path else 'N/A'}")
             st.write(f"**Type:** {current_receipt.receipt_type or 'Unknown'}")
             st.write(f"**Date:** {current_receipt.date.strftime('%d-%m-%Y') if current_receipt.date else 'N/A'}")
-            st.write(f"**Amount:** €{current_receipt.amount:.2f}" if current_receipt.amount else "**Amount:** N/A")
+            st.write(f"**Amount:** {formatear_monto(current_receipt.amount)}" if current_receipt.amount else "**Amount:** N/A")
             st.write(f"**Processed:** {current_receipt.created_at.strftime('%d-%m-%Y %H:%M') if current_receipt.created_at else 'N/A'}")
             
             # Extracted data in collapsible panel
@@ -369,7 +370,7 @@ def page_receipts():
                     bank_txn = matching_service.bank_repo.get_by_id(match.transaction_id)
                     if bank_txn:
                         st.write(f"**Bank Date:** {bank_txn.date.strftime('%d-%m-%Y')}")
-                        st.write(f"**Bank Amount:** €{bank_txn.amount:.2f}")
+                        st.write(f"**Bank Amount:** {formatear_monto(bank_txn.amount)}")
                         st.write(f"**Description:** {bank_txn.description or 'N/A'}")
                 
                 if match.is_conflict:
@@ -521,7 +522,7 @@ def page_bank_transactions():
         row = {
             'indice': index,
             'Date': txn.date.strftime('%d-%m-%Y'),
-            'Amount': f"€{txn.amount:.2f}",
+            'Amount': formatear_monto(txn.amount),
             'Description': txn.description or '',
             'Reference': txn.reference or '',
             'Receipt Type': txn.receipt_type or '',
@@ -750,7 +751,7 @@ def page_bank_transactions():
         st.write(f"File: {Path(current_unmatched.file_path).name if current_unmatched.file_path else 'N/A'}")
         st.write(f"Type: {current_unmatched.receipt_type or 'Unknown'}")
         st.write(f"Date: {current_unmatched.date.strftime('%d-%m-%Y') if current_unmatched.date else 'N/A'}")
-        st.write(f"Amount: €{current_unmatched.amount:.2f}" if current_unmatched.amount else "Amount: N/A")
+        st.write(f"Amount: {formatear_monto(current_unmatched.amount)}" if current_unmatched.amount else "Amount: N/A")
         desc = current_unmatched.description or (current_unmatched.extracted_data.get('empresa') if current_unmatched.extracted_data else '') or ''
         if desc:
             st.write(f"Description: {desc}")
@@ -766,7 +767,7 @@ def page_bank_transactions():
             option = st.selectbox(
                 "Attach to bank transaction",
                 options=[None] + unmatched_transactions,
-                format_func=lambda t: "Select a transaction" if t is None else f"ID {t.id} | {t.date.strftime('%d-%m-%Y')} | €{t.amount:.2f} | {t.description or ''}",
+                format_func=lambda t: "Select a transaction" if t is None else f"ID {t.id} | {t.date.strftime('%d-%m-%Y')} | {formatear_monto(t.amount)} | {t.description or ''}",
                 key=f"attach_txn_{current_unmatched.id}"
             )
             if st.button("🔗 Attach Receipt", key=f"attach_btn_{current_unmatched.id}", disabled=option is None):

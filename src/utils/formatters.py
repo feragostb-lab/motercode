@@ -134,17 +134,24 @@ def formatear_fecha(fecha: Optional[datetime], formato: str = '%d-%m-%Y') -> str
 def formatear_monto(monto: Optional[Decimal], simbolo: str = '€') -> str:
     """
     Format a Decimal amount to string with currency symbol.
+    Always uses dot (.) as decimal separator, regardless of locale.
     
     Args:
         monto: Decimal amount
         simbolo: Currency symbol
         
     Returns:
-        Formatted amount string or empty string if None
+        Formatted amount string with dot as decimal separator (e.g., "9.60€")
+        or empty string if None
+    
+    Examples:
+        formatear_monto(Decimal("9.60")) -> "9.60€"
+        formatear_monto(Decimal("1234.56"), "$") -> "1234.56$"
     """
     if monto is None:
         return ""
-    return f"{monto:.2f}{simbolo}"
+    # Force dot as decimal separator by using standard float formatting
+    return f"{float(monto):.2f}{simbolo}"
 
 
 def generar_nombre_archivo(fecha: Optional[datetime], monto: Optional[Decimal], 

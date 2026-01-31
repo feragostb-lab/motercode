@@ -20,7 +20,7 @@ from src.services.bank_matching_service import BankMatchingService
 from src.services.export_service import ExportService
 from src.repositories.worker_repository import WorkerRepository
 from src.repositories.period_repository import PeriodRepository
-from src.utils.formatters import format_date_spanish, format_datetime_spanish, format_month_year_display
+from src.utils.formatters import format_date_spanish, format_datetime_spanish, format_month_year_display, formatear_monto
 from src.models.domain import PeriodStatus
 
 
@@ -659,7 +659,7 @@ def page_visualization():
             data.append({
                 'ID': receipt.id,
                 'Fecha': format_date_spanish(receipt.date) if receipt.date else 'N/A',
-                'Importe': f"{float(receipt.amount):.2f}€" if receipt.amount else 'N/A',
+                'Importe': formatear_monto(receipt.amount) if receipt.amount else 'N/A',
                 'Tipo': receipt.receipt_type or 'N/A',
                 'Descripción': receipt.description or 'N/A',
                 'Match': match.match_type.value if match else 'sin_match',

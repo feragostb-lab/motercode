@@ -20,33 +20,20 @@ echo Installing PyInstaller...
 pip install --upgrade pyinstaller
 echo.
 
-REM Build Processor
+REM Build Unified App (NEW - v2.0)
 echo ============================================================
-echo Building RecibosProcessor.exe...
+echo Building RecibosApp.exe (Unified Application)...
 echo ============================================================
-pyinstaller build_config\processor.spec --clean --noconfirm
+pyinstaller build_config\app.spec --clean --noconfirm
 if %ERRORLEVEL% NEQ 0 (
-    echo ERROR: Processor build failed
+    echo ERROR: Unified app build failed
     pause
     exit /b 1
 )
-echo Processor build completed!
+echo Unified app build completed!
 echo.
 
-REM Build Dashboard
-echo ============================================================
-echo Building RecibosDashboard.exe...
-echo ============================================================
-pyinstaller build_config\dashboard.spec --clean --noconfirm
-if %ERRORLEVEL% NEQ 0 (
-    echo ERROR: Dashboard build failed
-    pause
-    exit /b 1
-)
-echo Dashboard build completed!
-echo.
-
-REM Build Setup
+REM Build Setup (Config utility)
 echo ============================================================
 echo Building ConfigSetup.exe...
 echo ============================================================
@@ -59,17 +46,27 @@ if %ERRORLEVEL% NEQ 0 (
 echo Setup build completed!
 echo.
 
+REM Optional: Build Legacy Apps (uncomment if needed)
+REM echo ============================================================
+REM echo Building Legacy Apps (optional)...
+REM echo ============================================================
+REM pyinstaller build_config\processor.spec --clean --noconfirm
+REM pyinstaller build_config\dashboard.spec --clean --noconfirm
+REM echo.
+
 echo ============================================================
 echo Build Summary
 echo ============================================================
 echo All executables built successfully in dist\ folder:
-echo   - RecibosProcessor.exe
-echo   - RecibosDashboard.exe
-echo   - ConfigSetup.exe
+echo   - RecibosApp.exe       (Main unified application - v2.0)
+echo   - ConfigSetup.exe      (Configuration utility)
+echo.
+echo NOTE: Legacy apps (RecibosProcessor.exe, RecibosDashboard.exe)
+echo       are no longer built by default. Uncomment in build.bat if needed.
 echo.
 echo Next steps:
-echo 1. Copy models\ folder to dist\
-echo 2. Copy config.yaml to dist\
-echo 3. Run installer.bat to create full package
+echo 1. Copy models\ folder to dist\RecibosApp\
+echo 2. Verify config.yaml is in dist\RecibosApp\
+echo 3. Run installer.bat to create full package (if available)
 echo ============================================================
 pause
