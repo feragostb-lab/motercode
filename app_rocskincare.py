@@ -422,7 +422,7 @@ def page_image_upload():
                 with cols[idx % 4]:
                     try:
                         img = Image.open(img_path)
-                        st.image(img, caption=img_path.name, use_column_width=True)
+                        st.image(img, caption=img_path.name, use_container_width=True)
                     except Exception as e:
                         st.error(f"Error: {img_path.name}")
             

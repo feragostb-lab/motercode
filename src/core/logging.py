@@ -5,6 +5,26 @@ from pathlib import Path
 from typing import Optional
 
 
+class SafeStream:
+    """Wrapper that silently ignores errors when writing to closed streams."""
+    def __init__(self, stream):
+        self.stream = stream
+
+    def write(self, data):
+        try:
+            if self.stream and not getattr(self.stream, 'closed', False):
+                self.stream.write(data)
+        except (ValueError, OSError, Exception):
+            pass
+
+    def flush(self):
+        try:
+            if self.stream and not getattr(self.stream, 'closed', False):
+                self.stream.flush()
+        except (ValueError, OSError, Exception):
+            pass
+
+
 class TeeStream:
     """Redirect stream to both file and original stream."""
     def __init__(self, file_path: str, original_stream):
@@ -15,7 +35,7 @@ class TeeStream:
     def _ensure_file_open(self):
         if self._file is None or getattr(self._file, 'closed', True):
             Path(self.file_path).parent.mkdir(parents=True, exist_ok=True)
-            self._file = open(self.file_path, 'a', encoding='utf-8', buffering=1)
+            self._file = open(self.file_path, 'a', encoding='utf-8', buffering=1, errors='replace')
 
     def write(self, data):
         if not data:
@@ -88,8 +108,14 @@ def setup_logging(config, app_name: str = 'app', capture_std: bool = True):
     root_logger = logging.getLogger()
     root_logger.setLevel(_level_from_string(config.logging_config.get('level', 'INFO')))
 
-    # Clear handlers to avoid duplicates in Streamlit reruns
-    root_logger.handlers.clear()
+    # Clear handlers and close them to avoid resource leaks and duplicates
+    if root_logger.hasHandlers():
+        for handler in root_logger.handlers[:]:
+            try:
+                handler.close()
+            except Exception:
+                pass
+            root_logger.removeHandler(handler)
 
     # Formatter
     fmt = config.logging_config.get('format', '%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -105,7 +131,8 @@ def setup_logging(config, app_name: str = 'app', capture_std: bool = True):
     root_logger.addHandler(file_handler)
 
     # Console handler (use original stdout to avoid recursion)
-    console_handler = logging.StreamHandler(sys.__stdout__)
+    # Wrap in SafeStream to protect against closed pipes (common in Windows/Streamlit restarts)
+    console_handler = logging.StreamHandler(SafeStream(sys.__stdout__))
     console_handler.setFormatter(formatter)
     root_logger.addHandler(console_handler)
 
@@ -126,8 +153,10 @@ def setup_logging(config, app_name: str = 'app', capture_std: bool = True):
             sys.stderr = sys.__stderr__
         
         # Create new TeeStreams
-        sys.stdout = TeeStream(str(log_file), sys.__stdout__)
-        sys.stderr = TeeStream(str(log_file), sys.__stderr__)
+        # Use a separate file for stdout capture to avoid file access contention with RotatingFileHandler on Windows
+        std_log_file = logs_dir / f"{app_name}_stdout.log"
+        sys.stdout = TeeStream(str(std_log_file), sys.__stdout__)
+        sys.stderr = TeeStream(str(std_log_file), sys.__stderr__)
 
     # Log initialized
-    logging.getLogger(__name__).info(f"Logging initialized for '{app_name}' -> {log_file}")
+    logging.getLogger(__name__).info(f"Logging initialized for '{app_name}' -> {log_file} (stdout -> {std_log_file if capture_std else 'console'})")

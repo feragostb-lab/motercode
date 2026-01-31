@@ -95,3 +95,188 @@ set CMAKE_ARGS=-DGGML_NATIVE=OFF -DGGML_AVX=OFF -DGGML_AVX2=OFF -DGGML_AVX512=OF
 pip install llama-cpp-python --no-cache-dir --force-reinstall
 
 ```
+
+
+
+Nivel Oro (AVX512): Para Workstations modernas y servidores (AMD Ryzen 7000/9000, Intel Core i9 nuevos). Máxima velocidad.
+
+Nivel Plata (AVX2 + FMA): Para la gran mayoría de PCs de los últimos 8-10 años. Velocidad estándar.
+
+Nivel Bronce (SSE2 - Legacy): El "fallback" seguro para hardware antiguo. Compatibilidad total.
+
+Aquí tienes el plan de batalla paso a paso.
+
+Paso 1: Crear el "Banco de DLLs"
+Vamos a compilar las variantes de mayor a menor y guardar sus DLLs.
+
+Crea una carpeta en la raíz de tu proyecto llamada libs_variants. Dentro crea dos carpetas: avx512 y avx2.
+
+1.1. Compilar para AVX512 (Nivel Oro)
+Ejecuta esto en tu consola:
+Paso 1: Variante AVX512 (Nivel Oro - Máxima Velocidad)
+Ejecuta este bloque completo en tu terminal PowerShell:
+
+PowerShell
+pip uninstall llama-cpp-python -y
+pip cache purge
+# En PowerShell se usa $env:VARIABLE = "valor"
+$env:CMAKE_ARGS = "-DGGML_AVX512=ON -DGGML_AVX2=ON -DGGML_FMA=ON -DGGML_F16C=ON"
+pip install llama-cpp-python --no-cache-dir --force-reinstall --verbose
+🛑 ACCIÓN AHORA:
+
+Ve a C:\WORKSPACE\gguf\.venv\Lib\site-packages\llama_cpp
+
+Copia todos los .dll (llama.dll, ggml.dll, etc.).
+
+Pégalos en tu carpeta C:\WORKSPACE\gguf\libs_variants\avx512.
+
+Paso 2: Variante AVX2 (Nivel Plata - Estándar Moderno)
+Una vez copiadas las DLLs anteriores, ejecuta esto para la siguiente versión:
+
+PowerShell
+pip uninstall llama-cpp-python -y
+pip cache purge
+# Activamos AVX2 pero desactivamos AVX512
+$env:CMAKE_ARGS = "-DGGML_AVX512=OFF -DGGML_AVX2=ON -DGGML_FMA=ON -DGGML_F16C=ON"
+pip install llama-cpp-python --no-cache-dir --force-reinstall --verbose
+🛑 ACCIÓN AHORA:
+
+Ve de nuevo a C:\WORKSPACE\gguf\.venv\Lib\site-packages\llama_cpp (ahora contiene la versión AVX2).
+
+Copia los .dll.
+
+Pégalos en C:\WORKSPACE\gguf\libs_variants\avx2.
+
+Paso 3: Variante Legacy (Nivel Bronce - Compatible)
+Esta será la que se quede instalada definitivamente en el sistema.
+
+PowerShell
+pip uninstall llama-cpp-python -y
+pip cache purge
+# Forzamos SSE2 y desactivamos todo lo moderno
+$env:CMAKE_ARGS = "-DGGML_NATIVE=OFF -DGGML_AVX=OFF -DGGML_AVX2=OFF -DGGML_AVX512=OFF -DGGML_FMA=OFF -DGGML_OPENMP=OFF -DGGML_CPU_ALL_VARIANTS=OFF"
+$env:CMAKE_C_FLAGS = "/arch:SSE2"
+$env:CMAKE_CXX_FLAGS = "/arch:SSE2"
+
+pip install llama-cpp-python --no-cache-dir --force-reinstall --verbose
+Paso 2: Actualizar app.spec
+Vamos a empaquetar las variantes dentro del ejecutable pero en carpetas separadas para que no se mezclen.
+
+Python
+# build_config/app.spec (fragmento a modificar)
+
+# ... imports ...
+
+extra_datas = [
+    # ... tus otros datas ...
+    
+    # 1. La versión Legacy (Base instalada) se va a la raíz de llama_cpp
+    (llama_cpp_root, 'llama_cpp'),
+    
+    # 2. Las variantes optimizadas se van a subcarpetas ocultas
+    ('libs_variants/avx2/*.dll', 'llama_cpp/variants/avx2'),
+    ('libs_variants/avx512/*.dll', 'llama_cpp/variants/avx512'),
+]
+
+# ... resto del archivo ...
+(Asegúrate de que la ruta libs_variants sea correcta relativa a donde ejecutas el build).
+
+Paso 3: El Selector Inteligente (Python)
+Este código debe ir al principio de todo en tu app.py. Usaremos la librería cpuinfo para interrogar al procesador y decidir qué DLLs copiar.
+
+Primero, añade py-cpuinfo a tus requirements si no lo tienes.
+
+Python
+import os
+import sys
+import shutil
+import logging
+# Es importante importar cpuinfo antes que cualquier cosa pesada
+try:
+    import cpuinfo
+except ImportError:
+    cpuinfo = None
+
+# Configurar logging para depuración
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logger = logging.getLogger("SmartBackend")
+
+def inject_optimal_backend():
+    """
+    Analiza la CPU y reemplaza las DLLs de llama.cpp antes de que sean cargadas.
+    Jerarquía: AVX512 > AVX2 > SSE2 (Default)
+    """
+    # Solo ejecutar si estamos en modo congelado (EXE)
+    if not getattr(sys, 'frozen', False):
+        return
+
+    try:
+        if cpuinfo is None:
+            logger.warning("py-cpuinfo no instalado. Usando backend por defecto (Legacy).")
+            return
+
+        info = cpuinfo.get_cpu_info()
+        flags = [f.lower() for f in info.get('flags', [])]
+        arch = info.get('arch', '').lower()
+
+        base_path = sys._MEIPASS
+        target_dir = os.path.join(base_path, 'llama_cpp')
+        variants_dir = os.path.join(target_dir, 'variants')
+        
+        selected_variant = None
+        
+        # --- Lógica de Selección ---
+        # 1. Chequear AVX512 (El Ferrari)
+        if 'avx512f' in flags or 'avx512' in flags: 
+            candidate = os.path.join(variants_dir, 'avx512')
+            if os.path.exists(candidate):
+                selected_variant = candidate
+                logger.info("🚀 DETECTADO: CPU High-End (Soporte AVX512).")
+
+        # 2. Si no, Chequear AVX2 (El Estándar Moderno)
+        if not selected_variant and 'avx2' in flags:
+            candidate = os.path.join(variants_dir, 'avx2')
+            if os.path.exists(candidate):
+                selected_variant = candidate
+                logger.info("⚡ DETECTADO: CPU Moderna (Soporte AVX2).")
+
+        # 3. Aplicar Cambios
+        if selected_variant:
+            logger.info(f"Inyectando librerías optimizadas desde: {selected_variant}")
+            
+            # Copiar todas las DLLs de la variante a la carpeta activa
+            dll_files = [f for f in os.listdir(selected_variant) if f.endswith('.dll')]
+            count = 0
+            for dll in dll_files:
+                src = os.path.join(selected_variant, dll)
+                dst = os.path.join(target_dir, dll)
+                try:
+                    shutil.copy2(src, dst)
+                    count += 1
+                except Exception as e:
+                    logger.error(f"Error copiando {dll}: {e}")
+            
+            logger.info(f"Backend actualizado con éxito. {count} librerías optimizadas cargadas.")
+        else:
+            logger.info("🐢 Hardware antiguo o variantes no encontradas. Usando modo Legacy (SSE2).")
+
+    except Exception as e:
+        logger.error(f"Error crítico en selector de backend: {e}")
+        logger.info("Continuando con configuración segura...")
+
+# --- PUNTO DE ENTRADA ---
+if __name__ == "__main__":
+    # EJECUTAR ESTO PRIMERO, ANTES DE IMPORTAR LLAMA_CPP
+    inject_optimal_backend()
+
+    # AHORA EL RESTO DE TUS IMPORTS
+    import streamlit as st
+    # ...
+¿Cómo funciona esto en la práctica?
+PC Gamer Moderno (Ryzen 7000): El script detecta avx512. Copia las DLLs de variants/avx512 y sobrescribe las SSE2. El encoding de imágenes tardará milisegundos.
+
+Laptop de Oficina (i5 8ª Gen): Detecta avx2. Copia las DLLs de variants/avx2. Rendimiento óptimo estándar.
+
+PC Viejo de Almacén (Pentium): No detecta flags. No hace nada. Usa las DLLs SSE2 originales. Funciona lento, pero funciona.
+
+Esta es la solución más profesional posible sin tener que distribuir 3 ejecutables diferentes.

@@ -30,7 +30,7 @@ def render() -> None:
 
     if uploaded_file is not None:
         file_bytes = uploaded_file.getvalue()
-        st.image(file_bytes, use_column_width=True)
+        st.image(file_bytes, use_container_width=True)
         st.markdown(f"**Archivo:** {uploaded_file.name} · {len(file_bytes) / 1024:.1f} KB")
 
         suffix = Path(uploaded_file.name).suffix or ".jpg"

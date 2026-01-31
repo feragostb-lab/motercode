@@ -1,76 +1,79 @@
+# -*- mode: python ; coding: utf-8 -*-
 """
 PyInstaller spec for Unified Application (app.py).
-This builds the modular app with all integrated components.
+This builds the modular app with all integrated components and hybrid backend support.
 """
 
-# -*- mode: python ; coding: utf-8 -*-
-from PyInstaller.utils.hooks import collect_all, collect_data_files, collect_submodules
-import sys
+from PyInstaller.utils.hooks import collect_all
 import os
-import llama_cpp
+import llama_cpp  # Necesario para localizar la ruta de instalación base
 
 block_cipher = None
 
-# --- MODIFICACIÓN LEGACY ---
-# Obtenemos la ruta raíz del paquete instalado para copiarlo entero
+# --- 1. LOCALIZACIÓN DE LA BASE INSTALADA (LEGACY/SSE2) ---
+# Esta ruta apunta a donde pip instaló la versión base
 llama_cpp_root = os.path.dirname(llama_cpp.__file__)
 
-# Collect all Streamlit components (critical for web assets)
+# --- 2. RECOLECCIÓN DE DEPENDENCIAS (AQUÍ ESTÁ STREAMLIT) ---
+# Recolectamos todo lo necesario para Streamlit, Altair y Plotly
 streamlit_datas, streamlit_binaries, streamlit_hiddenimports = collect_all('streamlit')
 altair_datas, altair_binaries, altair_hiddenimports = collect_all('altair')
 plotly_datas, plotly_binaries, plotly_hiddenimports = collect_all('plotly')
 
-
-# Additional data files
+# --- 3. DEFINICIÓN DE ARCHIVOS DE DATOS ---
+# Usamos '../' porque el archivo .spec está dentro de la carpeta 'build_config'
 extra_datas = [
-    # Include src package
+    # Código fuente y configuración
     ('../src', 'src'),
-    # Include modules package
     ('../modules', 'modules'),
-    # Include config
     ('../config.yaml', '.'),
     
-    # --- CAMBIO CRÍTICO ---
-    # Copiamos TODA la carpeta del paquete a 'llama_cpp' en el dist
-    # Esto asegura que ggml.dll y llama.dll (versiones SSE2) se copien correctamente
+    # APP PRINCIPAL
+    ('../app.py', '.'),
+
+    # --- MOTOR DE IA HÍBRIDO ---
+    # A) Versión Base (Legacy/SSE2) -> Se copia a la raíz de la librería
     (llama_cpp_root, 'llama_cpp'),
     
-    # Include app.py source code for Streamlit
-    ('../app.py', '.'),
+    # B) Variantes Optimizadas -> Se copian a carpetas ocultas para inyección
+    # Nota: Asumimos que la carpeta 'libs_variants' está en la raíz del proyecto
+    ('../libs_variants/avx2/*.dll', 'llama_cpp/variants/avx2'),
+    ('../libs_variants/avx512/*.dll', 'llama_cpp/variants/avx512'),
 ]
 
+# --- 4. ANÁLISIS ---
 a = Analysis(
     ['../app.py'],
     pathex=[],
+    # AQUÍ SE USAN LAS VARIABLES DEFINIDAS ARRIBA
     binaries=streamlit_binaries + altair_binaries + plotly_binaries,
     datas=extra_datas + streamlit_datas + altair_datas + plotly_datas,
     hiddenimports=[
-        # Streamlit (comprehensive collection via collect_all)
+        # Dependencias recolectadas automáticamente
         *streamlit_hiddenimports,
         *altair_hiddenimports,
         *plotly_hiddenimports,
-        # Additional Streamlit runtime dependencies
+        
+        # Streamlit Runtime extra
         'streamlit.runtime.scriptrunner.magic_funcs',
         'streamlit.elements.arrow_altair',
         'streamlit.components.v1',
         'streamlit.runtime.caching',
-        # OCR/AI
+        
+        # Librerías críticas
         'llama_cpp',
-        # Data processing
+        'cpuinfo',    # CRÍTICO: Para detectar el hardware en tiempo de ejecución
         'pandas',
         'openpyxl',
-        # Plotly already collected via collect_all
-        # System
         'pystray',
         'psutil',
         'win10toast',
         'PIL',
         'PIL._tkinter_finder',
-        # Config
         'yaml',
-        # Database
         'sqlite3',
-        # All module imports
+        
+        # Tus módulos de la aplicación
         'modules.processor_page',
         'modules.dashboard_receipts',
         'modules.dashboard_bank_transactions',
@@ -99,6 +102,7 @@ a = Analysis(
 
 pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
 
+# --- 5. EJECUTABLE (SOLO CONSOLA) ---
 exe = EXE(
     pyz,
     a.scripts,
@@ -109,15 +113,16 @@ exe = EXE(
     bootloader_ignore_signals=False,
     strip=False,
     upx=True,
-    console=True,  # Keep console for logging
+    console=True,
     disable_windowed_traceback=False,
     argv_emulation=False,
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    icon=None,  # TODO: Add icon file
+    icon=None,
 )
 
+# --- 6. COLECCIÓN (CARPETA FINAL) ---
 coll = COLLECT(
     exe,
     a.binaries,
