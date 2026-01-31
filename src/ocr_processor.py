@@ -385,8 +385,48 @@ class BackgroundOCRProcessor:
             img_config = self.config.processor.get('image_preprocessing', {})
             enable_grayscale = img_config.get('enable_grayscale', False)
             resize_factor = img_config.get('resize_factor', 0)
+            remove_whitespace = img_config.get('remove_whitespace', False)
             
             file_to_process = img_path
+            actual_original_image = img_path
+            
+            # Step 0: Convert PDF if needed
+            if img_path.suffix.lower() == '.pdf':
+                logger.debug(f"  ➜ Detected PDF, converting to image...")
+                from src.utils.file_helpers import convert_pdf_to_image
+                converted_path, was_converted = convert_pdf_to_image(
+                    str(img_path),
+                    temp_dir=self.config.paths.get('temp_dir', './temp')
+                )
+                if was_converted:
+                    actual_original_image = Path(converted_path)
+                    temp_file = converted_path
+                    file_to_process = actual_original_image
+                    logger.debug(f"  ➜ PDF converted to: {file_to_process}")
+
+            # Step 0.5: Remove whitespace if configured
+            if remove_whitespace:
+                logger.debug(f"  ➜ Reducing blank space (remove_whitespace=True)...")
+                from src.utils.file_helpers import remove_white_lines
+                trimmed_path, was_trimmed = remove_white_lines(
+                     str(file_to_process),
+                     temp_dir=self.config.paths.get('temp_dir', './temp')
+                )
+                if was_trimmed:
+                     # Clean up previous temp if it existed (e.g. from PDF conversion)
+                     if temp_file and temp_file != str(file_to_process):
+                         try:
+                             Path(temp_file).unlink(missing_ok=True)
+                         except:
+                             pass
+                     
+                     temp_file = trimmed_path
+                     file_to_process = Path(trimmed_path)
+                     
+                     # Update 'actual_original_image' so retries use the trimmed version too
+                     actual_original_image = file_to_process
+                         
+                     logger.debug(f"  ➜ Whitespace removed: {file_to_process}")
             
             # Step 1: Apply resize and/or grayscale if configured
             if resize_factor > 0 or enable_grayscale:
@@ -462,7 +502,8 @@ class BackgroundOCRProcessor:
                 logger.info("  🔄 Retrying with ORIGINAL image (no grayscale, no resize)...")
                 
                 # Re-encode original image without any optimization (no grayscale, no resize)
-                original_data_uri = f"data:image/jpeg;base64,{image_to_base64(img_path)}"
+                # Note: For PDFs, actual_original_image is the converted full-res image
+                original_data_uri = f"data:image/jpeg;base64,{image_to_base64(actual_original_image)}"
                 raw_response_retry = self._extract_with_simple_response(original_data_uri, stage=1)
                 
                 if raw_response_retry:
@@ -550,14 +591,17 @@ class BackgroundOCRProcessor:
             # Check for duplicates
             from src.utils.formatters import deduplicar_nombre_archivo
             existing = [f.name for f in output_dir.iterdir() if f.is_file()]
-            final_name = deduplicar_nombre_archivo(f"{base_name}{img_path.suffix}", existing)
+            
+            # Use extension of the actual image (ensures PDFs become .jpg)
+            final_name = deduplicar_nombre_archivo(f"{base_name}{actual_original_image.suffix}", existing)
             
             logger.debug(f"  ➜ Generated filename: {final_name}")
             
             # Copy file to output (only once)
             import shutil
             output_path = output_dir / final_name
-            shutil.copy2(str(img_path), str(output_path))
+            # Copy the actual image (converted if PDF), not the original PDF
+            shutil.copy2(str(actual_original_image), str(output_path))
             logger.debug(f"  ➜ Copied to: {output_path}")
             
             # Create Receipt in database
@@ -665,9 +709,38 @@ class BackgroundOCRProcessor:
             img_config = self.config.processor.get('image_preprocessing', {})
             enable_grayscale = img_config.get('enable_grayscale', False)
             resize_factor = img_config.get('resize_factor', 0)
+            remove_whitespace = img_config.get('remove_whitespace', False)
             
             file_to_process = img_path
             
+            # Step 0: Convert PDF if needed
+            if img_path.suffix.lower() == '.pdf':
+                logger.debug(f"  ➜ Detected PDF, converting to image...")
+                from src.utils.file_helpers import convert_pdf_to_image
+                converted_path, was_converted = convert_pdf_to_image(
+                    str(img_path),
+                    temp_dir=self.config.paths.get('temp_dir', './temp')
+                )
+                if was_converted:
+                    temp_file = converted_path
+                    file_to_process = Path(converted_path)
+                    logger.debug(f"  ➜ PDF converted to: {file_to_process}")
+            
+            # Step 0.5: Remove whitespace
+            if remove_whitespace:
+                logger.debug(f"  ➜ Reducing blank space (test mode)...")
+                from src.utils.file_helpers import remove_white_lines
+                trimmed_path, was_trimmed = remove_white_lines(str(file_to_process), temp_dir=self.config.paths.get('temp_dir', './temp'))
+                
+                if was_trimmed:
+                    if temp_file and temp_file != str(file_to_process):
+                         try: Path(temp_file).unlink(missing_ok=True)
+                         except: pass
+                    
+                    temp_file = trimmed_path
+                    file_to_process = Path(trimmed_path)
+                    logger.debug(f"  ➜ Whitespace removed: {file_to_process}")
+
             # Step 1: Apply resize and/or grayscale if configured
             if resize_factor > 0 or enable_grayscale:
                 logger.debug(f"  ➜ Applying image preprocessing (grayscale={enable_grayscale}, resize_factor={resize_factor})...")

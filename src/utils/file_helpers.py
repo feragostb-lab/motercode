@@ -71,6 +71,160 @@ def optimize_image_for_vlm(image_path: str, target_size: int = 672,
         return image_path, False
 
 
+def convert_pdf_to_image(pdf_path: str, temp_dir: str = './temp') -> Tuple[str, bool]:
+    """
+    Convert PDF to image (stitches pages vertically if multiple).
+    
+    Args:
+        pdf_path: Path to PDF file
+        temp_dir: Directory for temporary images
+        
+    Returns:
+        Tuple of (path_to_image, was_converted)
+    """
+    if not str(pdf_path).lower().endswith('.pdf'):
+        return pdf_path, False
+
+    try:
+        import fitz  # PyMuPDF
+    except ImportError:
+        logger.error("PyMuPDF (fitz) not found. Cannot convert PDF. Install 'pymupdf'.")
+        return pdf_path, False
+
+    try:
+        # Create temp directory
+        Path(temp_dir).mkdir(parents=True, exist_ok=True)
+        
+        doc = fitz.open(pdf_path)
+        if doc.page_count == 0:
+            return pdf_path, False
+            
+        images = []
+        total_height = 0
+        max_width = 0
+        
+        # Render each page to an image
+        for page in doc:
+            # Zoom = 2.0 for better quality (roughly 144 dpi)
+            pix = page.get_pixmap(matrix=fitz.Matrix(2, 2))
+            img_data = pix.tobytes("png")
+            img = Image.open(io.BytesIO(img_data))
+            images.append(img)
+            
+            total_height += img.height
+            max_width = max(max_width, img.width)
+            
+        doc.close()
+        
+        # Stitch images if multiple, otherwise use the single one
+        if len(images) > 1:
+            stitched_img = Image.new('RGB', (max_width, total_height), (255, 255, 255))
+            y_offset = 0
+            for img in images:
+                # Center image if smaller than max width
+                x_offset = (max_width - img.width) // 2
+                stitched_img.paste(img, (x_offset, y_offset))
+                y_offset += img.height
+            final_img = stitched_img
+        else:
+            final_img = images[0]
+            
+        # Save as JPG
+        temp_filename = f"pdf_conv_{Path(pdf_path).stem}.jpg"
+        temp_path = str(Path(temp_dir) / temp_filename)
+        final_img.save(temp_path, 'JPEG', quality=90)
+        
+        logger.info(f"Converted PDF {Path(pdf_path).name} to image {temp_filename} (pages={len(images)})")
+        return temp_path, True
+        
+    except Exception as e:
+        logger.error(f"Error converting PDF {pdf_path}: {e}")
+        return pdf_path, False
+
+
+def remove_white_lines(image_path: str, temp_dir: str = './temp', threshold: int = 50) -> Tuple[str, bool]:
+    """
+    Elimina grandes bloques de espacio horizontal blanco dentro de la imagen.
+    
+    Args:
+        image_path: Ruta a la imagen
+        temp_dir: Directorio para imágenes temporales
+        threshold: Número mínimo de filas blancas consecutivas para ser consideradas un espacio a borrar.
+    """
+    try:
+        import cv2
+        import numpy as np
+    except ImportError:
+        logger.error("OpenCV/Numpy missing")
+        return image_path, False
+
+    try:
+        img = cv2.imread(image_path)
+        if img is None:
+            return image_path, False
+
+        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+        
+        # Binarize (Invertir: texto=blanco, fondo=negro)
+        _, thresh = cv2.threshold(gray, 240, 255, cv2.THRESH_BINARY_INV)
+        
+        # Proyección horizontal
+        # Si la suma de píxeles blancos en una fila es 0 (o muy bajo), es una línea vacía
+        horizontal_sum = np.sum(thresh, axis=1)
+        
+        # Definimos qué es "contenido": filas que superan el 1% de 'ruido'
+        has_content = horizontal_sum > (thresh.shape[1] * 0.01 * 255)
+        
+        height = img.shape[0]
+        
+        # Máscara global de filas a mantener
+        mask = np.ones(height, dtype=bool)
+        
+        # Iterar para encontrar gaps consecutivos
+        empty_count = 0
+        for i in range(height):
+            if not has_content[i]:
+                empty_count += 1
+            else:
+                # Si veníamos de un hueco grande y encontramos contenido
+                if empty_count > threshold:
+                    # Marcamos para borrar (False) el hueco, dejando un pequeño margen (padding)
+                    padding = 20
+                    start_gap = i - empty_count + padding
+                    end_gap = i - padding
+                    
+                    if end_gap > start_gap:
+                        mask[start_gap:end_gap] = False
+                
+                empty_count = 0
+                
+        # Si la imagen termina en un gran espacio en blanco, borrarlo también
+        if empty_count > threshold:
+            start_gap = height - empty_count + 20
+            mask[start_gap:height] = False
+
+        # Si no hemos borrado nada, devolvemos false
+        if np.all(mask):
+            return image_path, False
+            
+        # Construir la nueva imagen usando la máscara
+        new_img = img[mask, :]
+
+        # Guardar
+        Path(temp_dir).mkdir(parents=True, exist_ok=True)
+        temp_filename = f"stitched_{Path(image_path).stem}.jpg"
+        temp_path = str(Path(temp_dir) / temp_filename)
+        
+        cv2.imwrite(temp_path, new_img)
+        logger.info(f"Removed internal whitespace: {img.shape[0]}h -> {new_img.shape[0]}h")
+        
+        return temp_path, True
+        
+    except Exception as e:
+        logger.error(f"Error removing white lines from {image_path}: {e}")
+        return image_path, False
+
+
 def resize_image_if_needed(image_path: str, max_size_kb: int = 150, 
                           temp_dir: str = './temp') -> Tuple[str, bool]:
     """
@@ -258,13 +412,13 @@ def get_file_extension(filename: str) -> str:
     return Path(filename).suffix
 
 
-def get_image_files(directory: str, extensions: Tuple[str, ...] = ('.jpg', '.jpeg', '.png')) -> list:
+def get_image_files(directory: str, extensions: Tuple[str, ...] = ('.jpg', '.jpeg', '.png', '.webp', '.pdf')) -> list:
     """
     Get all image files from a directory.
     
     Args:
         directory: Path to directory
-        extensions: Tuple of valid extensions
+        extensions: Tuple of valid extensions (default includes .pdf)
         
     Returns:
         List of image file paths

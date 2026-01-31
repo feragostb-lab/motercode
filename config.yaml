@@ -44,7 +44,8 @@ processor:
   # Image preprocessing configuration
   image_preprocessing:
     enable_grayscale: true
-    resize_factor: 784  # Resize longest side to this value (must be multiple of 28). Set to 0 to disable.
+    remove_whitespace: true # Remove horizontal white lines/empty space
+    resize_factor: 0  # Resize longest side to this value (must be multiple of 28). Set to 0 to disable.
 queue:
   max_attempts: 3
   retry_backoff_base_minutes: 2
@@ -261,6 +262,11 @@ receipt_type_definitions:
         question: "¿Es hotel o alojamiento?"
         weight: 10
       auxiliary_fields:
+        trip_number:
+          question: "Número de viaje/reserva o trip ID"
+          weight: 1
+          type: "text"
+          help: "Identificador de la reserva"
         nombre_hotel:
           question: "Nombre del hotel"
           weight: 1
@@ -290,6 +296,7 @@ receipt_type_definitions:
         hotel: 5
         hospedaje: 3
         alojamiento: 3
+        trip: 2
     
     - name: "Comidas"
       enabled: true
@@ -340,6 +347,11 @@ receipt_type_definitions:
         question: "¿Es vuelo aéreo?"
         weight: 10
       auxiliary_fields:
+        trip_number:
+          question: "Número de viaje/reserva o trip ID"
+          weight: 1
+          type: "text"
+          help: "Identificador de la reserva"
         compañia_aerea:
           question: "Compañía aérea"
           weight: 1
@@ -355,6 +367,7 @@ receipt_type_definitions:
         flight: 5
         aeropuerto: 3
         boarding: 3
+        trip: 2
     
     - name: "Tren"
       enabled: true
@@ -365,6 +378,11 @@ receipt_type_definitions:
         question: "¿Es billete de tren?"
         weight: 10
       auxiliary_fields:
+        trip_number:
+          question: "Número de viaje/reserva o trip ID"
+          weight: 1
+          type: "text"
+          help: "Identificador de la reserva"
         empresa_ferroviaria:
           question: "Empresa de tren"
           weight: 1
@@ -379,6 +397,7 @@ receipt_type_definitions:
         tren: 5
         train: 5
         renfe: 5
+        trip: 2
     
     - name: "Peaje"
       enabled: true

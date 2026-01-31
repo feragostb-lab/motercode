@@ -335,10 +335,10 @@ def page_image_upload():
     st.subheader("📁 Subir Imágenes")
     
     uploaded_files = st.file_uploader(
-        "Selecciona imágenes de recibos",
-        type=['jpg', 'jpeg', 'png', 'webp'],
+        "Selecciona imágenes de recibos o PDF",
+        type=['jpg', 'jpeg', 'png', 'webp', 'pdf'],
         accept_multiple_files=True,
-        help="Puedes seleccionar múltiples imágenes a la vez"
+        help="Puedes seleccionar múltiples archivos (imágenes o PDF) a la vez"
     )
     
     if uploaded_files:

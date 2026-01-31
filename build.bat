@@ -6,6 +6,12 @@ echo Building Receipt Processing System Executables
 echo ============================================================
 echo.
 
+
+REM 2. Limpieza de compilaciones previas (User Request)
+echo Limpiando carpetas temporales...
+if exist build rd /s /q build
+if exist dist rd /s /q dist
+
 REM Check if virtual environment is activated
 where python >nul 2>nul
 if %ERRORLEVEL% NEQ 0 (
@@ -31,6 +37,24 @@ echo.
 REM Install/update PyInstaller
 echo Instalando/actualizando PyInstaller...
 pip install --upgrade pyinstaller
+pip install py-cpuinfo
+echo.
+
+REM 1. Forzar compilacion para PC Antiguo (SSE2, sin AVX/FMA)
+echo Limpiando cache de pip para asegurar recompilacion limpia...
+pip cache purge
+
+echo Configurando flags de compilacion Legacy (SSE2)...
+REM Estos flags fuerzan a MSVC a usar SSE2 y desactivan optimizaciones modernas que crashean en CPUs viejas
+set CMAKE_ARGS=-DGGML_NATIVE=OFF -DGGML_AVX=OFF -DGGML_AVX2=OFF -DGGML_AVX512=OFF -DGGML_FMA=OFF -DGGML_F16C=OFF -DGGML_OPENMP=OFF -DCMAKE_C_FLAGS="/arch:SSE2" -DCMAKE_CXX_FLAGS="/arch:SSE2" -DGGML_CPU_ALL_VARIANTS=OFF
+
+echo Instalando llama-cpp-python con soporte Legacy...
+pip install llama-cpp-python --force-reinstall --no-cache-dir --verbose
+if %ERRORLEVEL% NEQ 0 (
+    echo ERROR: Fallo la compilacion de llama-cpp-python
+    pause
+    exit /b 1
+)
 echo.
 
 REM Build Unified App (NEW - v2.0)
@@ -59,6 +83,31 @@ if %ERRORLEVEL% NEQ 0 (
 )
 echo Setup build completed!
 echo.
+
+REM Build Hardware Diagnostic Tool
+echo ============================================================
+echo Building Hardware Check Utility...
+echo ============================================================
+pyinstaller --onefile --name check_ai_hardware scripts\check_ai_hardware.py
+if %ERRORLEVEL% NEQ 0 (
+    echo ERROR: Hardware Check build failed
+    pause
+    exit /b 1
+)
+
+REM Move Hardware Check to App folder and create launcher
+if exist dist\check_ai_hardware.exe (
+    echo Moving check_ai_hardware.exe to dist\RecibosApp...
+    move /Y dist\check_ai_hardware.exe dist\RecibosApp\
+    
+    echo Creating Diagnostic Launcher...
+    (
+        echo @echo off
+        echo echo Iniciando Diagnostico de Hardware...
+        echo check_ai_hardware.exe
+        echo pause
+    ) > dist\RecibosApp\DIAGNOSTICO_HARDWARE.bat
+)
 
 REM Optional: Build Legacy Apps (uncomment if needed)
 REM echo ============================================================

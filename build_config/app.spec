@@ -11,14 +11,15 @@ import llama_cpp
 
 block_cipher = None
 
-# Custom collection for llama_cpp to preserve lib structure
-llama_cpp_path = os.path.dirname(llama_cpp.__file__)
-llama_lib_path = os.path.join(llama_cpp_path, 'lib')
+# --- MODIFICACIÓN LEGACY ---
+# Obtenemos la ruta raíz del paquete instalado para copiarlo entero
+llama_cpp_root = os.path.dirname(llama_cpp.__file__)
 
 # Collect all Streamlit components (critical for web assets)
 streamlit_datas, streamlit_binaries, streamlit_hiddenimports = collect_all('streamlit')
 altair_datas, altair_binaries, altair_hiddenimports = collect_all('altair')
 plotly_datas, plotly_binaries, plotly_hiddenimports = collect_all('plotly')
+
 
 # Additional data files
 extra_datas = [
@@ -28,9 +29,13 @@ extra_datas = [
     ('../modules', 'modules'),
     # Include config
     ('../config.yaml', '.'),
-    # Include llama_cpp lib folder explicitly as data
-    (llama_lib_path, 'llama_cpp/lib'),
-    # Include app.py source code for Streamlit to run it
+    
+    # --- CAMBIO CRÍTICO ---
+    # Copiamos TODA la carpeta del paquete a 'llama_cpp' en el dist
+    # Esto asegura que ggml.dll y llama.dll (versiones SSE2) se copien correctamente
+    (llama_cpp_root, 'llama_cpp'),
+    
+    # Include app.py source code for Streamlit
     ('../app.py', '.'),
 ]
 
