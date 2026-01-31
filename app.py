@@ -200,4 +200,43 @@ def main():
             admin_page.render()
 
 if __name__ == "__main__":
-    main()
+    if st.runtime.exists():
+        main()
+    else:
+        import sys
+        import os
+        from streamlit.web import cli as stcli
+
+        # Default to running this script
+        script_path = os.path.abspath(__file__)
+
+        # Resolve target script path for frozen app (PyInstaller)
+        if getattr(sys, 'frozen', False):
+            # Locate the bundled app.py
+            # We added 'app.py' to datas, so it should be available in the bundle.
+            base_dir = getattr(sys, '_MEIPASS', os.path.dirname(os.path.abspath(sys.executable)))
+            
+            possible_paths = [
+                os.path.join(base_dir, 'app.py'),
+                os.path.join(base_dir, '_internal', 'app.py'), # Default internal folder for onedir
+                os.path.join(os.path.dirname(sys.executable), 'app.py'),
+            ]
+            
+            found = False
+            for p in possible_paths:
+                if os.path.exists(p):
+                    script_path = p
+                    found = True
+                    break
+            
+            if not found:
+                # Last resort: Assuming it's in the current directory if we are lucky
+                if os.path.exists("app.py"):
+                    script_path = "app.py"
+                else:
+                    print("Error: Could not find app.py source file for Streamlit!")
+                    print(f"Searched in: {possible_paths}")
+                    # Keep going to let it fail naturally or maybe it works if streamlit finds it differently
+        
+        sys.argv = ["streamlit", "run", script_path, "--global.developmentMode=false"]
+        sys.exit(stcli.main())

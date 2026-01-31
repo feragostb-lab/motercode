@@ -3,24 +3,32 @@ PyInstaller spec for Dashboard executable.
 """
 
 # -*- mode: python ; coding: utf-8 -*-
+from PyInstaller.utils.hooks import collect_all
 
 block_cipher = None
+
+# Collect all Streamlit components (critical for web assets)
+streamlit_datas, streamlit_binaries, streamlit_hiddenimports = collect_all('streamlit')
+plotly_datas, plotly_binaries, plotly_hiddenimports = collect_all('plotly')
+
+# Additional data files
+extra_datas = [
+    # Include src package
+    ('../src', 'src'),
+    # Include config
+    ('../config.yaml', '.'),
+]
 
 a = Analysis(
     ['../app_dashboard.py'],
     pathex=[],
-    binaries=[],
-    datas=[
-        # Include src package
-        ('../src', 'src'),
-        # Include config
-        ('../config.yaml', '.'),
-    ],
+    binaries=streamlit_binaries + plotly_binaries,
+    datas=extra_datas + streamlit_datas + plotly_datas,
     hiddenimports=[
-        'streamlit',
+        *streamlit_hiddenimports,
+        *plotly_hiddenimports,
         'pandas',
         'openpyxl',
-        'plotly',
         'PIL',
         'yaml',
     ],

@@ -6,21 +6,28 @@ This is a template - adjust as needed during implementation.
 """
 
 # -*- mode: python ; coding: utf-8 -*-
+from PyInstaller.utils.hooks import collect_all
 
 block_cipher = None
+
+# Collect all Streamlit components (critical for web assets)
+streamlit_datas, streamlit_binaries, streamlit_hiddenimports = collect_all('streamlit')
+
+# Additional data files
+extra_datas = [
+    # Include src package
+    ('../src', 'src'),
+    # Include config example
+    ('../config.yaml', '.'),
+]
 
 a = Analysis(
     ['../app_processor.py'],
     pathex=[],
-    binaries=[],
-    datas=[
-        # Include src package
-        ('../src', 'src'),
-        # Include config example
-        ('../config.yaml', '.'),
-    ],
+    binaries=streamlit_binaries,
+    datas=extra_datas + streamlit_datas,
     hiddenimports=[
-        'streamlit',
+        *streamlit_hiddenimports,
         'llama_cpp',
         'llama_cpp.llama_chat_format',
         'pystray',

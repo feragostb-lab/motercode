@@ -92,16 +92,27 @@ echo     echo Database will be created automatically on first use.
 echo     echo.
 echo ^)
 echo.
-echo REM Start the application
+echo REM Start the application with console output visible
 echo echo Starting RecibosApp...
-echo start "" "app\RecibosApp.exe"
-echo.
-echo echo Application started!
-echo echo Check the browser window that should open automatically.
-echo echo If browser doesn't open, navigate to: http://localhost:8501
 echo echo.
-echo echo Press any key to close this window...
-echo pause ^>nul
+echo echo IMPORTANTE: Esta ventana mostrara los mensajes de la aplicacion.
+echo echo NO la cierres hasta que termines de usar la aplicacion.
+echo echo.
+echo echo Si ves errores aqui, presiona cualquier tecla para salir y reportalos.
+echo echo.
+echo echo Iniciando en 3 segundos...
+echo timeout /t 3 /nobreak ^>nul
+echo.
+echo REM Run the application directly in this console window ^(no START^)
+echo "app\RecibosApp.exe"
+echo.
+echo echo.
+echo echo ============================================================
+echo echo La aplicacion ha terminado.
+echo echo Si viste errores arriba, por favor reportalos.
+echo echo ============================================================
+echo echo.
+echo pause
 ) > "%PACKAGE_DIR%\START_APP.bat"
 
 REM Create config setup script

@@ -15,14 +15,28 @@ if %ERRORLEVEL% NEQ 0 (
     exit /b 1
 )
 
+REM Verify critical dependencies
+echo Verificando dependencias criticas...
+python -c "import streamlit; print('  Streamlit:', streamlit.__version__)" || (
+    echo ERROR: Streamlit no esta instalado
+    echo Ejecuta: pip install -r requirements.txt
+    pause
+    exit /b 1
+)
+python -c "from PyInstaller.utils.hooks import collect_all; print('  PyInstaller hooks: OK')" 2>nul || (
+    echo ADVERTENCIA: PyInstaller puede no tener todos los hooks
+)
+echo.
+
 REM Install/update PyInstaller
-echo Installing PyInstaller...
+echo Instalando/actualizando PyInstaller...
 pip install --upgrade pyinstaller
 echo.
 
 REM Build Unified App (NEW - v2.0)
 echo ============================================================
 echo Building RecibosApp.exe (Unified Application)...
+echo Usando archivo: build_config\app.spec
 echo ============================================================
 pyinstaller build_config\app.spec --clean --noconfirm
 if %ERRORLEVEL% NEQ 0 (

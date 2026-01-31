@@ -4,34 +4,57 @@ This builds the modular app with all integrated components.
 """
 
 # -*- mode: python ; coding: utf-8 -*-
+from PyInstaller.utils.hooks import collect_all, collect_data_files, collect_submodules
+import sys
+import os
+import llama_cpp
 
 block_cipher = None
+
+# Custom collection for llama_cpp to preserve lib structure
+llama_cpp_path = os.path.dirname(llama_cpp.__file__)
+llama_lib_path = os.path.join(llama_cpp_path, 'lib')
+
+# Collect all Streamlit components (critical for web assets)
+streamlit_datas, streamlit_binaries, streamlit_hiddenimports = collect_all('streamlit')
+altair_datas, altair_binaries, altair_hiddenimports = collect_all('altair')
+plotly_datas, plotly_binaries, plotly_hiddenimports = collect_all('plotly')
+
+# Additional data files
+extra_datas = [
+    # Include src package
+    ('../src', 'src'),
+    # Include modules package
+    ('../modules', 'modules'),
+    # Include config
+    ('../config.yaml', '.'),
+    # Include llama_cpp lib folder explicitly as data
+    (llama_lib_path, 'llama_cpp/lib'),
+    # Include app.py source code for Streamlit to run it
+    ('../app.py', '.'),
+]
 
 a = Analysis(
     ['../app.py'],
     pathex=[],
-    binaries=[],
-    datas=[
-        # Include src package
-        ('../src', 'src'),
-        # Include modules package
-        ('../modules', 'modules'),
-        # Include config
-        ('../config.yaml', '.'),
-    ],
+    binaries=streamlit_binaries + altair_binaries + plotly_binaries,
+    datas=extra_datas + streamlit_datas + altair_datas + plotly_datas,
     hiddenimports=[
-        # Streamlit
-        'streamlit',
+        # Streamlit (comprehensive collection via collect_all)
+        *streamlit_hiddenimports,
+        *altair_hiddenimports,
+        *plotly_hiddenimports,
+        # Additional Streamlit runtime dependencies
         'streamlit.runtime.scriptrunner.magic_funcs',
         'streamlit.elements.arrow_altair',
+        'streamlit.components.v1',
+        'streamlit.runtime.caching',
         # OCR/AI
         'llama_cpp',
-        'llama_cpp.llama_chat_format',
         # Data processing
         'pandas',
         'openpyxl',
-        'plotly',
-        'plotly.graph_objs',
+        # Plotly already collected via collect_all
         # System
         'pystray',
         'psutil',

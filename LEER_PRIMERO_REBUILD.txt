@@ -1,0 +1,91 @@
+╔════════════════════════════════════════════════════════════════╗
+║  🔴 IMPORTANTE: DEBES RECONSTRUIR EL EJECUTABLE               ║
+╚════════════════════════════════════════════════════════════════╝
+
+El error que viste:
+    ModuleNotFoundError: No module named 'streamlit'
+
+Ocurrió porque el ejecutable fue construido ANTES de que modificáramos
+los archivos .spec para incluir Streamlit correctamente.
+
+╔════════════════════════════════════════════════════════════════╗
+║  ✅ SOLUCIÓN: Sigue estos pasos EN ORDEN                      ║
+╚════════════════════════════════════════════════════════════════╝
+
+PASO 1: Verificar que todo está listo
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Ejecuta:
+    verify_build_ready.bat
+
+Debe mostrar: "[EXITO] Todas las verificaciones pasaron!"
+
+Si hay errores, ejecuta:
+    pip install -r requirements.txt
+
+
+PASO 2: RECONSTRUIR el ejecutable
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Ejecuta:
+    build.bat
+
+Espera a que termine (5-10 minutos).
+Debe completar sin errores.
+
+
+PASO 3: Crear el paquete de distribución
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Ejecuta:
+    installer.bat
+
+Esto crea un nuevo paquete en: dist\RecibosPackage\
+
+
+PASO 4: Probar el nuevo ejecutable
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+1. Ve a: dist\RecibosPackage\
+2. Ejecuta: START_APP.bat
+3. ¡Ahora SÍ debería funcionar!
+
+
+╔════════════════════════════════════════════════════════════════╗
+║  📝 ¿Qué se modificó para solucionar esto?                    ║
+╚════════════════════════════════════════════════════════════════╝
+
+Se modificaron los archivos .spec para usar collect_all():
+
+    from PyInstaller.utils.hooks import collect_all
+    
+    streamlit_datas, streamlit_binaries, streamlit_hiddenimports = collect_all('streamlit')
+
+Esto empaqueta TODOS los componentes de Streamlit:
+✅ Módulos Python
+✅ Archivos web (JS, CSS, HTML)
+✅ Componentes internos
+✅ Metadatos
+
+Archivos modificados:
+- build_config\app.spec        ⭐ (principal)
+- build_config\dashboard.spec
+- build_config\processor.spec
+
+
+╔════════════════════════════════════════════════════════════════╗
+║  🐛 Si todavía falla después de reconstruir                   ║
+╚════════════════════════════════════════════════════════════════╝
+
+Usa el modo debug:
+    start_debug.bat
+
+Verifica que se creó la carpeta de Streamlit:
+    dist\RecibosApp\_internal\streamlit\
+
+Revisa los logs de PyInstaller:
+    build\RecibosApp\warn-RecibosApp.txt
+
+
+╔════════════════════════════════════════════════════════════════╗
+║  📞 Más ayuda                                                  ║
+╚════════════════════════════════════════════════════════════════╝
+
+Lee el archivo completo:
+    SOLUCION_STREAMLIT_ERROR.md
